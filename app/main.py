@@ -35,6 +35,7 @@ def crear_libro(libro: schemas.LibroCreate, db: Session = Depends(get_db)):
         isbn=libro.isbn,
         copias_totales=libro.copias_totales,
         copias_disponibles=libro.copias_totales,
+        portada_url=libro.portada_url
     )
     db.add(nuevo_libro)
     db.commit()
