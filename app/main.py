@@ -140,54 +140,66 @@ def listar_prestamos(db: Session = Depends(get_db)):
 
 @app.get("/google-books/{isbn}")
 def buscar_en_google_books(isbn: str):
-    """Consulta la API de Google Books usando el ISBN escaneado, con plan de contingencia ante bloqueos (429)."""
-    url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
+    """
+    Consulta directamente la API pública de Google Books usando el ISBN.
+    Limpia el formato del ISBN y asegura portadas con protocolo seguro (HTTPS).
+    """
+    # Limpiamos el ISBN de guiones o espacios para que la búsqueda sea exacta
+    isbn_limpio = isbn.replace("-", "").strip()
+
+    # URL oficial de la API de Google Books
+    url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn_limpio}"
+
     try:
-        # Añadimos un tiempo límite de 5 segundos para que la petición no se quede colgada
+        # Hacemos la consulta real a Google con un tiempo límite de 5 segundos
         response = requests.get(url, timeout=5)
 
-        # PLAN B: Si Google nos bloquea con un Código 429 (Too Many Requests)
+        # Si Google nos bloquea por límite de peticiones de la red (429)
         if response.status_code == 429:
-            return {
-                "isbn": isbn,
-                "titulo": "El Principito (Plan de Contingencia 429)",
-                "autor": "Antoine de Saint-Exupéry",
-                "portada_url": "http://books.google.com/books/content?id=COLaDwAAQBAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
-                "nota": "Servicio de Google temporalmente limitado (429). Usando datos de simulación local."
-            }
+            raise HTTPException(
+                status_code=429,
+                detail="Google Books ha limitado temporalmente esta dirección IP (Error 429: Too Many Requests). Intenta usar una conexión de datos móviles para bypassear el límite escolar."
+            )
 
-        # Si ocurre otro tipo de error en el servidor de Google
         if response.status_code != 200:
             raise HTTPException(
-                status_code=500, detail="Error al conectar con Google Books"
+                status_code=500,
+                detail=f"Error al conectar con Google Books (Código de respuesta: {response.status_code})"
             )
 
         data = response.json()
         if "items" not in data or len(data["items"]) == 0:
             raise HTTPException(
                 status_code=404,
-                detail="No se encontró información para este ISBN en Google Books",
+                detail="No se encontró ningún libro con este ISBN en la base de datos de Google Books."
             )
 
-        # Extraer la información real si todo salió excelente
+        # Extraer la información real del primer resultado encontrado
         info = data["items"]["volumeInfo"]
         titulo = info.get("title", "Título desconocido")
         autores = ", ".join(info.get("authors", ["Autor desconocido"]))
+
+        # Recuperar la portada de Google Books
         portada = info.get("imageLinks", {}).get("thumbnail", None)
 
+        # SOLUCIÓN DE IMAGEN ROTA: Forzar HTTPS para que el navegador móvil/web cargue la imagen de forma segura
+        if portada and portada.startswith("http://"):
+            portada = portada.replace("http://", "https://")
+
         return {
-            "isbn": isbn,
+            "isbn": isbn_limpio,
             "titulo": titulo,
             "autor": autores,
             "portada_url": portada
         }
 
-    except requests.exceptions.RequestException:
-        # PLAN C: Si la máquina se queda completamente sin internet (Modo Offline)
-        return {
-            "isbn": isbn,
-            "titulo": "Libro de Prueba (Modo Offline)",
-            "autor": "Autor Offline",
-            "portada_url": None,
-            "nota": "El contenedor no tiene acceso a internet. Usando datos de simulación local."
-        }
+    except requests.exceptions.Timeout:
+        raise HTTPException(
+            status_code=504,
+            detail="Tiempo de espera agotado al intentar conectar con Google Books."
+        )
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error de red o de comunicación: {str(e)}"
+        )
