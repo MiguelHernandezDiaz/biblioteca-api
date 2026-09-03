@@ -12,6 +12,7 @@ class Libro(Base):
     isbn = Column(String, unique=True, index=True)
     copias_totales = Column(Integer, default=1)
     copias_disponibles = Column(Integer, default=1)
+    portada_url = Column(String, nullable=True)
 
     prestamos = relationship("Prestamo", back_populates="libro")
 

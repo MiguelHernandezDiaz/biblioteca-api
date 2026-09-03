@@ -1,3 +1,4 @@
+import requests
 from datetime import date, timedelta
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -134,3 +135,35 @@ def devolver_libro(prestamo_id: int, db: Session = Depends(get_db)):
 @app.get("/prestamos/", response_model=list[schemas.PrestamoOut])
 def listar_prestamos(db: Session = Depends(get_db)):
     return db.query(models.Prestamo).all()
+
+@app.get("/google-books/{isbn}")
+def buscar_en_google_books(isbn: str):
+    """Consulta la API de Google Books usando el ISBN escaneado."""
+    url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=500, detail="Error al conectar con Google Books"
+        )
+
+    data = response.json()
+    if "items" not in data or len(data["items"]) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontró información para este ISBN en Google Books",
+        )
+
+    # Extraer la información relevante
+    info = data["items"][0]["volumeInfo"]
+
+    titulo = info.get("title", "Título desconocido")
+    autores = ", ".join(info.get("authors", ["Autor desconocido"]))
+    portada = info.get("imageLinks", {}).get("thumbnail", None)
+
+    return {
+        "isbn": isbn,
+        "titulo": titulo,
+        "autor": autores,
+        "portada_url": portada,
+    }

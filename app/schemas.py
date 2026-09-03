@@ -9,7 +9,7 @@ class LibroBase(BaseModel):
     autor: str
     isbn: str
     copias_totales: int = 1
-
+    portada_url: Optional[str] = None
 
 class LibroCreate(LibroBase):
     pass
