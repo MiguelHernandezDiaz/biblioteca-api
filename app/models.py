@@ -13,6 +13,7 @@ class Libro(Base):
     copias_totales = Column(Integer, default=1)
     copias_disponibles = Column(Integer, default=1)
     portada_url = Column(String, nullable=True)
+    activo = Column(Boolean, default=True)
 
     prestamos = relationship("Prestamo", back_populates="libro")
 
@@ -37,6 +38,7 @@ class Prestamo(Base):
     fecha_prestamo = Column(Date, nullable=False)
     fecha_limite = Column(Date, nullable=False)
     fecha_devolucion = Column(Date, nullable=True)  # null = aún no devuelto
+    activo = Column(Boolean, default=True)
 
     libro = relationship("Libro", back_populates="prestamos")
     usuario = relationship("Usuario", back_populates="prestamos")

@@ -45,7 +45,7 @@ def crear_libro(libro: schemas.LibroCreate, db: Session = Depends(get_db)):
 
 @app.get("/libros/", response_model=list[schemas.LibroOut])
 def listar_libros(db: Session = Depends(get_db)):
-    return db.query(models.Libro).all()
+    return db.query(models.Libro).filter(models.Libro.activo == True).all()
 
 
 @app.get("/libros/{libro_id}", response_model=schemas.LibroOut)
@@ -58,11 +58,26 @@ def obtener_libro(libro_id: int, db: Session = Depends(get_db)):
 
 @app.delete("/libros/{libro_id}", status_code=204)
 def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
-    libro = db.query(models.Libro).filter(models.Libro.id == libro_id).first()
+    libro = db.query(models.Libro).filter(models.Libro.id == libro_id, models.Libro.activo == True).first()
     if not libro:
-        raise HTTPException(status_code=404, detail="Libro no encontrado")
-    db.delete(libro)
+        raise HTTPException(status_code=404, detail="Libro no encontrado o ya eliminado")
+
+    # REGLA 1: No dejar borrar si hay un préstamo activo (activo == True)
+    prestamo_activo = db.query(models.Prestamo).filter(
+        models.Prestamo.libro_id == libro_id,
+        models.Prestamo.activo == True
+    ).first()
+
+    if prestamo_activo:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede eliminar el libro porque actualmente tiene un préstamo activo sin devolver."
+        )
+
+    # Si no tiene préstamos activos, hacemos borrado lógico
+    libro.activo = False
     db.commit()
+    return None
 
 
 # ==================== USUARIOS ====================
@@ -116,17 +131,25 @@ def crear_prestamo(prestamo: schemas.PrestamoCreate, db: Session = Depends(get_d
 
 
 @app.put("/prestamos/{prestamo_id}/devolver", response_model=schemas.PrestamoOut)
+@app.put("/prestamos/{prestamo_id}/devolver", response_model=schemas.PrestamoOut)
 def devolver_libro(prestamo_id: int, db: Session = Depends(get_db)):
     prestamo = db.query(models.Prestamo).filter(models.Prestamo.id == prestamo_id).first()
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
-    if prestamo.fecha_devolucion is not None:
-        raise HTTPException(status_code=400, detail="Este préstamo ya fue devuelto")
 
+    if not prestamo.activo:  # O prestamo.fecha_devolucion is not None
+        raise HTTPException(status_code=400, detail="Este préstamo ya fue devuelto e inactivado")
+
+    # Registrar fecha de devolución
     prestamo.fecha_devolucion = date.today()
 
+    # REGLA 2: El préstamo pasa a estar inactivo (ahora es historial)
+    prestamo.activo = False
+
+    # Devolver copia al inventario del libro
     libro = db.query(models.Libro).filter(models.Libro.id == prestamo.libro_id).first()
-    libro.copias_disponibles += 1
+    if libro:
+        libro.copias_disponibles += 1
 
     db.commit()
     db.refresh(prestamo)

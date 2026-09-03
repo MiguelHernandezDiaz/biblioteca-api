@@ -19,7 +19,7 @@ class LibroOut(LibroBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     copias_disponibles: int
-
+    activo: bool
 
 # ---------- Usuario ----------
 class UsuarioBase(BaseModel):
@@ -52,3 +52,4 @@ class PrestamoOut(BaseModel):
     fecha_prestamo: date
     fecha_limite: date
     fecha_devolucion: Optional[date] = None
+    activo: bool
