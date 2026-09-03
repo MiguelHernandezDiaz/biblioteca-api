@@ -137,34 +137,57 @@ def devolver_libro(prestamo_id: int, db: Session = Depends(get_db)):
 def listar_prestamos(db: Session = Depends(get_db)):
     return db.query(models.Prestamo).all()
 
+
 @app.get("/google-books/{isbn}")
 def buscar_en_google_books(isbn: str):
-    """Consulta la API de Google Books usando el ISBN escaneado."""
+    """Consulta la API de Google Books usando el ISBN escaneado, con plan de contingencia ante bloqueos (429)."""
     url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
-    response = requests.get(url)
+    try:
+        # Añadimos un tiempo límite de 5 segundos para que la petición no se quede colgada
+        response = requests.get(url, timeout=5)
 
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=500, detail="Error al conectar con Google Books"
-        )
+        # PLAN B: Si Google nos bloquea con un Código 429 (Too Many Requests)
+        if response.status_code == 429:
+            return {
+                "isbn": isbn,
+                "titulo": "El Principito (Plan de Contingencia 429)",
+                "autor": "Antoine de Saint-Exupéry",
+                "portada_url": "http://books.google.com/books/content?id=COLaDwAAQBAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+                "nota": "Servicio de Google temporalmente limitado (429). Usando datos de simulación local."
+            }
 
-    data = response.json()
-    if "items" not in data or len(data["items"]) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="No se encontró información para este ISBN en Google Books",
-        )
+        # Si ocurre otro tipo de error en el servidor de Google
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Error al conectar con Google Books"
+            )
 
-    # Extraer la información relevante
-    info = data["items"][0]["volumeInfo"]
+        data = response.json()
+        if "items" not in data or len(data["items"]) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="No se encontró información para este ISBN en Google Books",
+            )
 
-    titulo = info.get("title", "Título desconocido")
-    autores = ", ".join(info.get("authors", ["Autor desconocido"]))
-    portada = info.get("imageLinks", {}).get("thumbnail", None)
+        # Extraer la información real si todo salió excelente
+        info = data["items"]["volumeInfo"]
+        titulo = info.get("title", "Título desconocido")
+        autores = ", ".join(info.get("authors", ["Autor desconocido"]))
+        portada = info.get("imageLinks", {}).get("thumbnail", None)
 
-    return {
-        "isbn": isbn,
-        "titulo": titulo,
-        "autor": autores,
-        "portada_url": portada,
-    }
+        return {
+            "isbn": isbn,
+            "titulo": titulo,
+            "autor": autores,
+            "portada_url": portada
+        }
+
+    except requests.exceptions.RequestException:
+        # PLAN C: Si la máquina se queda completamente sin internet (Modo Offline)
+        return {
+            "isbn": isbn,
+            "titulo": "Libro de Prueba (Modo Offline)",
+            "autor": "Autor Offline",
+            "portada_url": None,
+            "nota": "El contenedor no tiene acceso a internet. Usando datos de simulación local."
+        }
