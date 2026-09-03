@@ -138,65 +138,63 @@ def listar_prestamos(db: Session = Depends(get_db)):
     return db.query(models.Prestamo).all()
 
 
-@app.get("/google-books/{isbn}")
-def buscar_en_google_books(isbn: str):
+@app.get("/open-library/{isbn}")
+def buscar_en_open_library(isbn: str):
     """
-    Consulta directamente la API pública de Google Books usando el ISBN.
-    Limpia el formato del ISBN y asegura portadas con protocolo seguro (HTTPS).
+    Consulta directamente la API pública de Open Library usando el ISBN.
+    No requiere API Key y evita bloqueos por límite de peticiones (429).
     """
-    # Limpiamos el ISBN de guiones o espacios para que la búsqueda sea exacta
+    # Limpiamos el ISBN de guiones o espacios para asegurar la búsqueda
     isbn_limpio = isbn.replace("-", "").strip()
 
-    # URL oficial de la API de Google Books
-    url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn_limpio}"
+    # URL de la API de Open Library (solicitando formato JSON y datos enriquecidos)
+    url = f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn_limpio}&format=json&jscmd=data"
 
     try:
-        # Hacemos la consulta real a Google con un tiempo límite de 5 segundos
         response = requests.get(url, timeout=5)
-
-        # Si Google nos bloquea por límite de peticiones de la red (429)
-        if response.status_code == 429:
-            raise HTTPException(
-                status_code=429,
-                detail="Google Books ha limitado temporalmente esta dirección IP (Error 429: Too Many Requests). Intenta usar una conexión de datos móviles para bypassear el límite escolar."
-            )
 
         if response.status_code != 200:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error al conectar con Google Books (Código de respuesta: {response.status_code})"
+                detail=f"Error al conectar con Open Library (Código: {response.status_code})"
             )
 
         data = response.json()
-        if "items" not in data or len(data["items"]) == 0:
+        key = f"ISBN:{isbn_limpio}"
+
+        # Open Library devuelve un objeto vacío si no encuentra el ISBN
+        if key not in data:
             raise HTTPException(
                 status_code=404,
-                detail="No se encontró ningún libro con este ISBN en la base de datos de Google Books."
+                detail="No se encontró ningún libro con este ISBN en Open Library."
             )
 
-        # Extraer la información real del primer resultado encontrado
-        info = data["items"]["volumeInfo"]
-        titulo = info.get("title", "Título desconocido")
-        autores = ", ".join(info.get("authors", ["Autor desconocido"]))
+        libro_info = data[key]
+        titulo = libro_info.get("title", "Título desconocido")
 
-        # Recuperar la portada de Google Books
-        portada = info.get("imageLinks", {}).get("thumbnail", None)
+        # Open Library devuelve los autores como una lista de diccionarios: [{"name": "Haruki Murakami"}]
+        autores_list = libro_info.get("authors", [])
+        autor = ", ".join([a.get("name") for a in autores_list]) if autores_list else "Autor desconocido"
 
-        # SOLUCIÓN DE IMAGEN ROTA: Forzar HTTPS para que el navegador móvil/web cargue la imagen de forma segura
-        if portada and portada.startswith("http://"):
-            portada = portada.replace("http://", "https://")
+        # Recuperar la portada (Open Library ofrece tamaños: 'small', 'medium', 'large')
+        portada_dict = libro_info.get("cover", {})
+        portada_url = portada_dict.get("large", portada_dict.get("medium", portada_dict.get("small", None)))
+
+        # Forzar HTTPS en la imagen para evitar bloqueos de seguridad en el navegador
+        if portada_url and portada_url.startswith("http://"):
+            portada_url = portada_url.replace("http://", "https://")
 
         return {
             "isbn": isbn_limpio,
             "titulo": titulo,
-            "autor": autores,
-            "portada_url": portada
+            "autor": autor,
+            "portada_url": portada_url
         }
 
     except requests.exceptions.Timeout:
         raise HTTPException(
             status_code=504,
-            detail="Tiempo de espera agotado al intentar conectar con Google Books."
+            detail="Tiempo de espera agotado al conectar con Open Library."
         )
     except requests.exceptions.RequestException as e:
         raise HTTPException(
