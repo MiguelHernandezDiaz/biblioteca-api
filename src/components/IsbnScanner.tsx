@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader, BrowserCodeReader, BarcodeFormat } from '@zxing/browser';
+import { DecodeHintType } from '@zxing/library';
 import {
   Camera,
   CameraOff,
@@ -14,7 +15,14 @@ import {
   Plus,
   Layers,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  ShieldAlert,
+  Copy,
+  Check,
+  ExternalLink,
+  Lock,
+  ZoomIn,
+  Target
 } from 'lucide-react';
 import { fetchFromOpenLibrary } from '../services/openLibrary';
 import { BibliotecaStorage } from '../services/storage';
@@ -44,6 +52,7 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamControlsRef = useRef<{ stop: () => void } | null>(null);
   const currentStreamRef = useRef<MediaStream | null>(null);
+  const stopNativeDetectorRef = useRef<(() => void) | null>(null);
 
   // States
   const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'manual'>('camera');
@@ -52,8 +61,15 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isInsecureContext, setIsInsecureContext] = useState(false);
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [isTorchSupported, setIsTorchSupported] = useState(false);
+  const [copiedHttpsUrl, setCopiedHttpsUrl] = useState(false);
+
+  // Zoom and Focus
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isHardwareZoomSupported, setIsHardwareZoomSupported] = useState(false);
+  const [tapFocusCoords, setTapFocusCoords] = useState<{ x: number; y: number } | null>(null);
 
   // Manual & Scan states
   const [manualIsbn, setManualIsbn] = useState('');
@@ -65,16 +81,18 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
   const [isBookAddedSuccess, setIsBookAddedSuccess] = useState(false);
   const [existingBookInDb, setExistingBookInDb] = useState<Libro | null>(null);
 
-  // Initialize ZXing Reader
+  // Initialize ZXing Reader with high-accuracy hints
   useEffect(() => {
     const hints = new Map();
-    // Prioritize 1D formats for book ISBNs
-    hints.set(2, [
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8,
       BarcodeFormat.CODE_128,
       BarcodeFormat.CODE_39,
+      BarcodeFormat.UPC_A,
     ]);
+    hints.set(DecodeHintType.TRY_HARDER, true);
+
     const reader = new BrowserMultiFormatReader(hints);
     readerRef.current = reader;
 
@@ -172,20 +190,93 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
     [isLoadingBook, scannedIsbn]
   );
 
+  const applyZoom = useCallback(async (newZoom: number) => {
+    setZoomLevel(newZoom);
+    if (!currentStreamRef.current) return;
+    const track = currentStreamRef.current.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      const capabilities = (track.getCapabilities ? track.getCapabilities() : {}) as any;
+      if (capabilities?.zoom) {
+        const minZ = capabilities.zoom.min || 1;
+        const maxZ = capabilities.zoom.max || 4;
+        const targetZ = Math.min(Math.max(newZoom, minZ), maxZ);
+        await (track as any).applyConstraints({
+          advanced: [{ zoom: targetZ }],
+        });
+      }
+    } catch (e) {
+      console.warn('Hardware zoom failed, CSS zoom active:', e);
+    }
+  }, []);
+
+  const handleTapToFocus = useCallback(
+    async (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+      if (!videoRef.current) return;
+      const rect = videoRef.current.getBoundingClientRect();
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      setTapFocusCoords({ x, y });
+      setTimeout(() => setTapFocusCoords(null), 1400);
+
+      if (!currentStreamRef.current) return;
+      const track = currentStreamRef.current.getVideoTracks()[0];
+      if (track && (track as any).applyConstraints) {
+        try {
+          const capabilities = (track.getCapabilities ? track.getCapabilities() : {}) as any;
+          if (capabilities?.focusMode?.includes('continuous')) {
+            await (track as any).applyConstraints({
+              advanced: [{ focusMode: 'continuous' }],
+            });
+          }
+        } catch (err) {
+          console.warn('Refocus error:', err);
+        }
+      }
+    },
+    []
+  );
+
   const startCamera = useCallback(async () => {
     if (!videoRef.current || !readerRef.current) return;
 
     stopCamera();
     setCameraError(null);
+    setIsInsecureContext(false);
+
+    // 1. Check if the environment is a Secure Context (HTTPS or localhost)
+    const isLocalhost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const isSecure = typeof window !== 'undefined' && (Boolean(window.isSecureContext) || isLocalhost || isHttps);
+
+    if (!isSecure || typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setIsInsecureContext(true);
+      setHasCameraPermission(false);
+      setIsScanning(false);
+      setCameraError(
+        'El navegador bloquea la cámara en direcciones IP por HTTP (contexto no seguro). Los navegadores modernos exigen HTTPS o localhost para permitir acceso a la cámara.'
+      );
+      return;
+    }
 
     try {
       const constraints: MediaStreamConstraints = {
         video: selectedDeviceId
-          ? { deviceId: { exact: selectedDeviceId } }
+          ? {
+              deviceId: { exact: selectedDeviceId },
+              width: { ideal: 1920, min: 1280 },
+              height: { ideal: 1080, min: 720 },
+            }
           : {
               facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
+              width: { ideal: 1920, min: 1280 },
+              height: { ideal: 1080, min: 720 },
             },
         audio: false,
       };
@@ -194,11 +285,23 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
       currentStreamRef.current = stream;
       setHasCameraPermission(true);
 
-      // Check torch compatibility
+      // Inspect track capabilities (Torch, Zoom, Focus)
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        const capabilities = videoTrack.getCapabilities?.() as { torch?: boolean } | undefined;
+        const capabilities = (videoTrack.getCapabilities ? videoTrack.getCapabilities() : {}) as any;
         setIsTorchSupported(Boolean(capabilities?.torch));
+        setIsHardwareZoomSupported(Boolean(capabilities?.zoom));
+
+        // Attempt continuous autofocus
+        if (capabilities?.focusMode?.includes('continuous')) {
+          try {
+            await (videoTrack as any).applyConstraints({
+              advanced: [{ focusMode: 'continuous' }],
+            });
+          } catch (e) {
+            console.warn('Continuous focus constraint ignored:', e);
+          }
+        }
       }
 
       if (videoRef.current) {
@@ -211,15 +314,47 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
       // Start continuous scanning using ZXing
       const controls = await readerRef.current.decodeFromVideoElement(
         videoRef.current,
-        (result, error) => {
+        (result) => {
           if (result) {
             const text = result.getText();
             handleIsbnDetected(text);
           }
-          // Scan errors on individual frames are normal while searching
         }
       );
       streamControlsRef.current = controls;
+
+      // Native BarcodeDetector (instant hardware decoding in Chrome & Android)
+      if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+        try {
+          const detector = new (window as any).BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'code_128', 'upc_a'],
+          });
+
+          let isNativeActive = true;
+          const runNativeDetection = async () => {
+            if (!isNativeActive || !videoRef.current) return;
+            if (videoRef.current.readyState >= 2) {
+              try {
+                const barcodes = await detector.detect(videoRef.current);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                  handleIsbnDetected(barcodes[0].rawValue);
+                }
+              } catch {
+                // Ignore transient frame errors
+              }
+            }
+            if (isNativeActive) {
+              window.setTimeout(runNativeDetection, 140);
+            }
+          };
+          runNativeDetection();
+          stopNativeDetectorRef.current = () => {
+            isNativeActive = false;
+          };
+        } catch (err) {
+          console.warn('Native BarcodeDetector not available:', err);
+        }
+      }
     } catch (err: unknown) {
       console.error('Camera error:', err);
       setHasCameraPermission(false);
@@ -227,13 +362,13 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
       const errName = err instanceof Error ? err.name : '';
       if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
         setCameraError(
-          'Permiso de cámara denegado. Habilita el acceso a la cámara en los permisos de tu navegador.'
+          'Permiso de cámara denegado. El navegador ha bloqueado el permiso en este sitio.'
         );
       } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
         setCameraError('No se encontró ninguna cámara conectada en este dispositivo.');
       } else {
         setCameraError(
-          'No se pudo inicializar la cámara. Puedes usar la subida de imagen o búsqueda manual.'
+          'No se pudo inicializar la cámara. Verifica que ninguna otra aplicación la esté usando.'
         );
       }
     }
@@ -438,42 +573,105 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
           </div>
 
           {/* Video Viewport & Scanning Target */}
-          <div className="relative aspect-4/3 w-full bg-slate-950 flex items-center justify-center overflow-hidden">
+          <div
+            id="camera-viewport-container"
+            onClick={handleTapToFocus}
+            className="relative aspect-4/3 w-full bg-slate-950 flex items-center justify-center overflow-hidden cursor-crosshair select-none"
+          >
             <video
               ref={videoRef}
               id="barcode-scanner-video"
               autoPlay
               playsInline
               muted
-              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'center center',
+                transition: 'transform 0.2s ease-out',
+              }}
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
             />
+
+            {/* Tap-To-Focus Indicator Ring */}
+            {tapFocusCoords && (
+              <div
+                className="absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2 border-2 border-emerald-400 rounded-full animate-ping pointer-events-none z-30 shadow-[0_0_12px_#34d399]"
+                style={{ left: tapFocusCoords.x, top: tapFocusCoords.y }}
+              />
+            )}
 
             {/* Error or Permission Denied Notice */}
             {cameraError && (
-              <div className="absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center p-6 text-center space-y-4">
-                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
-                  <CameraOff className="w-6 h-6" />
+              <div className="absolute inset-0 bg-slate-950/95 z-20 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center text-center space-y-3">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  isInsecureContext ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'
+                }`}>
+                  {isInsecureContext ? <ShieldAlert className="w-6 h-6" /> : <CameraOff className="w-6 h-6" />}
                 </div>
-                <div className="max-w-md">
-                  <h4 className="text-white font-semibold text-base mb-1">Cámara no disponible</h4>
-                  <p className="text-slate-300 text-sm">{cameraError}</p>
+
+                <div className="max-w-md space-y-1">
+                  <h4 className="text-white font-bold text-base">
+                    {isInsecureContext ? 'Contexto Inseguro (HTTP por IP)' : 'Cámara no disponible'}
+                  </h4>
+                  <p className="text-slate-300 text-xs leading-relaxed">
+                    {cameraError}
+                  </p>
                 </div>
-                <div className="flex gap-2">
+
+                {isInsecureContext ? (
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 max-w-md text-left text-xs text-slate-300 space-y-2">
+                    <p className="font-semibold text-amber-300 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5" />
+                      ¿Cómo acceder desde tu móvil u otros equipos?
+                    </p>
+                    <ul className="space-y-1.5 list-disc list-inside text-[11px] text-slate-400">
+                      <li>
+                        <strong className="text-slate-200">En tu PC local:</strong> Ejecuta <code className="text-blue-400 bg-slate-800 px-1 py-0.5 rounded">npm run dev:https</code> para habilitar HTTPS en la red local.
+                      </li>
+                      <li>
+                        <strong className="text-slate-200">En tu móvil:</strong> Abre <code className="text-blue-400 bg-slate-800 px-1 py-0.5 rounded">https://IP-DE-TU-PC:3000</code> y acepta el certificado local.
+                      </li>
+                      <li>
+                        <strong className="text-slate-200">O mediante túnel:</strong> Ejecuta <code className="text-emerald-400 bg-slate-800 px-1 py-0.5 rounded">npx localtunnel --port 3000</code> para un enlace HTTPS público instantáneo.
+                      </li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 max-w-md text-left text-[11px] text-slate-300 space-y-1.5">
+                    <p className="font-semibold text-slate-200">Para permitir la cámara en tu navegador:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                      <li>Haz clic en el icono de candado o configuración junto a la barra de direcciones.</li>
+                      <li>Busca <strong>Cámara / Permisos</strong> y cámbialo a <strong>Permitir</strong>.</li>
+                      <li>Vuelve a pulsar el botón de reintentar aquí abajo.</li>
+                    </ol>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 justify-center pt-1">
                   <button
                     id="retry-camera-access-btn"
                     type="button"
                     onClick={startCamera}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-colors"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   >
-                    Reintentar permiso
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Reintentar permiso</span>
+                  </button>
+                  <button
+                    id="switch-to-upload-from-camera-btn"
+                    type="button"
+                    onClick={() => setActiveTab('upload')}
+                    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                  >
+                    Subir foto
                   </button>
                   <button
                     id="switch-to-manual-from-camera-btn"
                     type="button"
                     onClick={() => setActiveTab('manual')}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-medium transition-colors"
+                    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition-colors cursor-pointer"
                   >
-                    Usar modo manual
+                    Búsqueda manual
                   </button>
                 </div>
               </div>
@@ -481,7 +679,7 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
 
             {/* Optical Target Box */}
             {!cameraError && (
-              <div className="relative z-10 w-72 h-44 sm:w-88 sm:h-52 rounded-xl border-2 border-dashed border-white/60 shadow-2xl flex flex-col items-center justify-between p-2">
+              <div className="relative z-10 w-72 h-44 sm:w-88 sm:h-52 rounded-xl border-2 border-dashed border-white/60 shadow-2xl flex flex-col items-center justify-between p-2 pointer-events-none">
                 {/* 4 Corner Markers */}
                 <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg" />
                 <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg" />
@@ -492,28 +690,58 @@ export const IsbnScanner: React.FC<IsbnScannerProps> = ({
                 <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#34d399] animate-scan-laser pointer-events-none" />
 
                 <div className="w-full text-center">
-                  <span className="bg-black/60 text-white/90 text-xs px-2.5 py-1 rounded-full backdrop-blur-xs font-medium">
+                  <span className="bg-black/60 text-white/90 text-[11px] sm:text-xs px-2.5 py-1 rounded-full backdrop-blur-xs font-medium">
                     Apunta al código de barras del libro
                   </span>
                 </div>
 
                 <div className="w-full text-center">
-                  <span className="text-[11px] text-emerald-300/90 font-mono tracking-wider">
-                    ISBN-13 / EAN-13
+                  <span className="text-[10px] sm:text-[11px] text-emerald-300/90 font-mono tracking-wider">
+                    Toca la pantalla para reenfocar &bull; EAN-13 / ISBN-13
                   </span>
                 </div>
+              </div>
+            )}
+
+            {/* Floating Zoom Controls for Macro Distance */}
+            {!cameraError && isScanning && (
+              <div
+                className="absolute bottom-3 right-3 z-20 flex items-center gap-1 bg-slate-900/80 backdrop-blur-xs border border-slate-700/80 rounded-xl p-1 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="text-[10px] text-slate-400 px-1.5 font-medium flex items-center gap-1">
+                  <ZoomIn className="w-3 h-3 text-slate-300" />
+                  Zoom:
+                </span>
+                {[1, 1.5, 2, 2.5].map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => applyZoom(z)}
+                    className={`px-2 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                      zoomLevel === z
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    {z}x
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
           {/* Quick Help Footer */}
-          <div className="p-3 bg-slate-900 text-xs text-slate-400 flex items-center justify-between border-t border-slate-800">
-            <span>Sujeta el libro a unos 15–20 cm con buena luz</span>
+          <div className="p-3 bg-slate-900 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800">
+            <span className="flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Sujeta el libro a 20–30 cm y usa <strong>Zoom 2x</strong> para enfocar sin distorsión</span>
+            </span>
             <button
               id="camera-sample-quick-btn"
               type="button"
               onClick={() => handleManualSearch('9780307474728')}
-              className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+              className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Probar con ISBN demo
