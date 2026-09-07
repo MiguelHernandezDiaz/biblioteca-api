@@ -1,35 +1,70 @@
-# Sistema de Gestión de Biblioteca — Frontend & Escáner ISBN
+# Sistema de Gestión de Biblioteca — API
 
-Frontend moderno y responsivo para el sistema de biblioteca con escáner de códigos de barras ISBN en tiempo real mediante webcam y cámara de smartphone, integrado con la API pública de **Open Library**.
+Proyecto de Tecnologías Computacionales.
+Stack: **Python + FastAPI + PostgreSQL + Docker**
 
-## Características Principales
+## Estructura del proyecto
 
-1. **Escáner ISBN con Cámara Web / Móvil**:
-   - Detección en vivo de códigos de barras ISBN-13 y EAN-13 utilizando `@zxing/browser`.
-   - Soporte para alternar cámaras (cámara frontal / trasera con macro).
-   - Control de linterna / flash en dispositivos móviles compatibles.
-   - Efectos sonoros y hápticos al detectar el código.
-   - Subida de fotografías o búsqueda manual con libros de ejemplo listos para probar.
+```
+biblioteca/
+├── app/
+│   ├── __init__.py
+│   ├── main.py        # Endpoints de la API
+│   ├── models.py       # Modelos de SQLAlchemy (tablas)
+│   ├── schemas.py      # Esquemas de Pydantic (validación)
+│   └── database.py     # Conexión a PostgreSQL
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── README.md
+```
 
-2. **Integración con Open Library**:
-   - Al escanear un ISBN, autocompleta instantáneamente título, autor(es), año de publicación, editorial y portada oficial en alta resolución.
-   - Registro en el catálogo con un solo clic especificando el número de copias.
+## Cómo correrlo en Lubuntu
 
-3. **Catálogo de Libros (`/libros/`)**:
-   - Visualización de libros con portadas, disponibilidad en tiempo real e ISBN.
-   - Búsqueda y filtrado por título, autor, ISBN y stock.
-   - **Regla 1 de Integridad**: Protección que impide eliminar libros que tengan préstamos activos sin devolver.
+1. Copia esta carpeta completa a tu máquina Lubuntu (por USB, git, scp, etc.)
+2. Abre una terminal dentro de la carpeta `biblioteca/`
+3. Levanta todo con un solo comando:
 
-4. **Préstamos y Devoluciones (`/prestamos/`)**:
-   - Préstamo de libros con selección de lector y plazo (7, 14, 21, 30 días).
-   - Descuento y reposición automática de copias disponibles.
-   - **Regla 2**: Devolución con registro de fecha de retorno y reactivación de inventario.
-   - Identificación visual de préstamos vencidos con cálculo de días de atraso.
+   ```bash
+   docker compose up --build
+   ```
 
-5. **Gestión de Lectores (`/usuarios/`)**:
-   - Registro de usuarios con validación de correo electrónico único.
-   - Historial y préstamos activos por usuario.
+4. Espera a que veas en la terminal que la API arrancó (mensaje de `Uvicorn running on http://0.0.0.0:8000`)
+5. Abre tu navegador en:
 
-6. **Consola y Documentación de Endpoints**:
-   - Probador interactivo de los endpoints REST originales (`/libros/`, `/usuarios/`, `/prestamos/`, `/open-library/{isbn}`).
+   - **http://localhost:8000** → mensaje de bienvenida
+   - **http://localhost:8000/docs** → documentación interactiva (Swagger UI), aquí puedes probar todos los endpoints sin escribir código
 
+## Para detener el servidor
+
+En la terminal donde está corriendo, presiona `Ctrl + C`, y luego:
+
+```bash
+docker compose down
+```
+
+Si quieres borrar también los datos guardados en la base de datos:
+
+```bash
+docker compose down -v
+```
+
+## Endpoints disponibles
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/libros/` | Crear un libro |
+| GET | `/libros/` | Listar todos los libros |
+| GET | `/libros/{id}` | Obtener un libro por ID |
+| DELETE | `/libros/{id}` | Eliminar un libro |
+| POST | `/usuarios/` | Crear un usuario |
+| GET | `/usuarios/` | Listar usuarios |
+| POST | `/prestamos/` | Registrar un préstamo (descuenta copia disponible) |
+| PUT | `/prestamos/{id}/devolver` | Marcar un préstamo como devuelto |
+| GET | `/prestamos/` | Listar todos los préstamos |
+
+## Notas
+
+- La base de datos vive dentro de un volumen de Docker (`postgres_data`), así que los datos persisten aunque apagues los contenedores (a menos que uses `-v` al bajarlos).
+- El código de `app/` está montado como volumen en `docker-compose.yml`, así que si editas los archivos `.py`, el servidor se recarga solo (gracias a `--reload`).
+- Las credenciales de la base de datos en este proyecto son de práctica/desarrollo. Si algún día lo llevas a producción, cámbialas y no las subas a un repositorio público.
