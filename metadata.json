@@ -1,0 +1,10 @@
+{
+  "name": "Biblioteca - Sistema de Gestión",
+  "description": "Sistema de gestión de biblioteca con catálogo de libros disponibles, usuarios, préstamos activos y escáner de ISBN por cámara.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
