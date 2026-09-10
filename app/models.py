@@ -1,44 +1,50 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date
-from sqlalchemy.orm import relationship
-from app.database import Base
+from django.db import models
+from datetime import date
+
+class Libro(models.Model):
+    titulo = models.CharField(max_length=255)
+    autor = models.CharField(max_length=255)
+    isbn = models.CharField(max_length=50, unique=True, db_index=True)
+    copias_totales = models.PositiveIntegerField(default=1)
+    copias_disponibles = models.PositiveIntegerField(default=1)
+    portada_url = models.TextField(blank=True, null=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'libros'
+        verbose_name = 'Libro'
+        verbose_name = 'Libros'
+
+    def __str__(self):
+        return f"{self.titulo} ({self.isbn})"
 
 
-class Libro(Base):
-    __tablename__ = "libros"
+class Usuario(models.Model):
+    nombre = models.CharField(max_length=255)
+    email = models.EmailField(unique=True, db_index=True)
+    activo = models.BooleanField(default=True)
 
-    id = Column(Integer, primary_key=True, index=True)
-    titulo = Column(String, nullable=False, index=True)
-    autor = Column(String, nullable=False)
-    isbn = Column(String, unique=True, index=True)
-    copias_totales = Column(Integer, default=1)
-    copias_disponibles = Column(Integer, default=1)
-    portada_url = Column(String, nullable=True)
-    activo = Column(Boolean, default=True)
+    class Meta:
+        db_table = 'usuarios'
+        verbose_name = 'Usuario'
+        verbose_name_plural = 'Usuarios'
 
-    prestamos = relationship("Prestamo", back_populates="libro")
-
-
-class Usuario(Base):
-    __tablename__ = "usuarios"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    activo = Column(Boolean, default=True)
-
-    prestamos = relationship("Prestamo", back_populates="usuario")
+    def __str__(self):
+        return f"{self.nombre} <{self.email}>"
 
 
-class Prestamo(Base):
-    __tablename__ = "prestamos"
+class Prestamo(models.Model):
+    libro = models.ForeignKey(Libro, on_delete=models.CASCADE, related_name='prestamos')
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='prestamos')
+    fecha_prestamo = models.DateField(default=date.today)
+    fecha_limite = models.DateField()
+    fecha_devolucion = models.DateField(blank=True, null=True)
+    activo = models.BooleanField(default=True)
 
-    id = Column(Integer, primary_key=True, index=True)
-    libro_id = Column(Integer, ForeignKey("libros.id"), nullable=False)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
-    fecha_prestamo = Column(Date, nullable=False)
-    fecha_limite = Column(Date, nullable=False)
-    fecha_devolucion = Column(Date, nullable=True)  # null = aún no devuelto
-    activo = Column(Boolean, default=True)
+    class Meta:
+        db_table = 'prestamos'
+        verbose_name = 'Préstamo'
+        verbose_name_plural = 'Préstamos'
 
-    libro = relationship("Libro", back_populates="prestamos")
-    usuario = relationship("Usuario", back_populates="prestamos")
+    def __str__(self):
+        return f"Préstamo #{self.id}: {self.libro.titulo} -> {self.usuario.nombre}"
