@@ -1,9 +1,17 @@
+import os
+from django.conf import settings
 from django.urls import path, re_path
+from django.views.static import serve
 from app import views
 
 urlpatterns = [
     path('', views.root, name='root'),
     
+    # Static assets for frontend
+    re_path(r'^assets/(?P<path>.*)$', serve, {
+        'document_root': os.path.join(settings.BASE_DIR, 'dist', 'assets')
+    }),
+
     # Libros
     re_path(r'^libros/?$', views.libros_list, name='libros_list'),
     re_path(r'^libros/(?P<pk>\d+)/?$', views.libro_detail, name='libro_detail'),

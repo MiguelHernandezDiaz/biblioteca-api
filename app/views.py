@@ -13,6 +13,9 @@ from app.serializers import LibroSerializer, UsuarioSerializer, PrestamoSerializ
 
 @api_view(['GET'])
 def root(request):
+    dist_index = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dist', 'index.html')
+    if os.path.exists(dist_index):
+        return FileResponse(open(dist_index, 'rb'), content_type='text/html')
     return Response({
         "mensaje": "API de biblioteca con Django y Django REST Framework funcionando.",
         "admin": "/admin/",

@@ -41,12 +41,24 @@ biblioteca/
    - **http://localhost/admin/** → Panel de Administración de Django
    - **http://localhost/scanner** o **https://<IP_DE_TU_PC>/scanner** → Escáner de libros por cámara (HTTPS para móviles)
 
-## Crear un Superusuario para el Administrador de Django
-En otra terminal dentro de la carpeta del proyecto:
+## Credenciales por Defecto
+
+### 1. Panel de Administración de Django (`/admin/`)
+Al levantar con `docker compose`, se crea automáticamente el siguiente superusuario:
+- **Usuario:** `admin`
+- **Contraseña:** `admin1234`
+- **Correo:** `admin@biblioteca.com`
+
+*(Si deseas crear otro superusuario personalizado en cualquier momento:)*
 ```bash
 docker compose exec api python manage.py createsuperuser
 ```
-Ingresa tu nombre de usuario, correo y contraseña. Luego ingresa a `/admin/` para gestionar libros, usuarios y préstamos con la interfaz administrativa de Django.
+
+### 2. Base de Datos PostgreSQL (Docker)
+- **Usuario:** `biblioteca_user`
+- **Contraseña:** `biblioteca_pass`
+- **Base de datos:** `biblioteca_db`
+- **Puerto:** `5432`
 
 ## Endpoints REST Disponibles
 | Método | Ruta | Descripción |
