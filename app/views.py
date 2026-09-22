@@ -1,7 +1,7 @@
 import os
 import requests
 from datetime import date, timedelta
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -11,12 +11,31 @@ from app.models import Libro, Usuario, Prestamo
 from app.serializers import LibroSerializer, UsuarioSerializer, PrestamoSerializer
 
 
-@api_view(['GET'])
 def root(request):
+    """
+    Sirve el frontend interactivo de la biblioteca si se accede desde un navegador web.
+    Si se solicita explícitamente application/json (p. ej. scripts o cURL), devuelve la info JSON.
+    """
+    accept = request.headers.get('Accept', '')
+    if 'application/json' in accept and 'text/html' not in accept:
+        return JsonResponse({
+            "mensaje": "API de biblioteca con Django y Django REST Framework funcionando.",
+            "admin": "/admin/",
+            "scanner": "/scanner",
+            "endpoints": ["/libros/", "/usuarios/", "/prestamos/", "/open-library/<isbn>"]
+        })
+
+    # 1. Servir app/index.html (incluido dentro del repositorio y Docker sin requerir npm build)
+    app_index = os.path.join(os.path.dirname(__file__), 'index.html')
+    if os.path.exists(app_index):
+        return FileResponse(open(app_index, 'rb'), content_type='text/html')
+
+    # 2. Servir dist/index.html si fue compilado con Vite
     dist_index = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dist', 'index.html')
     if os.path.exists(dist_index):
         return FileResponse(open(dist_index, 'rb'), content_type='text/html')
-    return Response({
+
+    return JsonResponse({
         "mensaje": "API de biblioteca con Django y Django REST Framework funcionando.",
         "admin": "/admin/",
         "scanner": "/scanner",
