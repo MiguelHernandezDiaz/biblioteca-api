@@ -323,43 +323,92 @@ export async function devolverPrestamo(prestamoId: number): Promise<Prestamo> {
 }
 
 export async function searchOpenLibrary(isbn: string): Promise<OpenLibraryResult> {
-  const cleanIsbn = isbn.replace(/-/g, '').trim();
+  const cleanIsbn = isbn.replace(/[-\s]/g, '').trim();
   if (!cleanIsbn) {
     throw new Error('El código ISBN no puede estar vacío.');
   }
 
-  const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${cleanIsbn}&format=json&jscmd=data`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Error al consultar Open Library (Código: ${res.status})`);
+  // 1. First attempt: Open Library Search API by ISBN
+  try {
+    const searchUrl = `https://openlibrary.org/search.json?isbn=${encodeURIComponent(cleanIsbn)}&limit=1`;
+    const res = await fetch(searchUrl);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.docs && data.docs.length > 0) {
+        const doc = data.docs[0];
+        const titulo = doc.title || 'Título desconocido';
+        const autor =
+          doc.author_name && doc.author_name.length > 0
+            ? doc.author_name.join(', ')
+            : (doc.by_statement || 'Autor desconocido');
+
+        let portadaUrl: string | null = null;
+        if (doc.cover_i) {
+          portadaUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+        } else {
+          portadaUrl = `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`;
+        }
+
+        return {
+          isbn: cleanIsbn,
+          titulo,
+          autor,
+          portada_url: portadaUrl,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Open Library search.json falló, intentando endpoint directo...', err);
   }
 
-  const data = await res.json();
-  const key = `ISBN:${cleanIsbn}`;
+  // 2. Second attempt: Direct ISBN JSON endpoint (supports automatic redirect)
+  try {
+    const directUrl = `https://openlibrary.org/isbn/${encodeURIComponent(cleanIsbn)}.json`;
+    const res = await fetch(directUrl);
+    if (res.ok) {
+      const book = await res.json();
+      const titulo = book.title || 'Título desconocido';
 
-  if (!data[key]) {
-    throw new Error(`No se encontró ningún libro con el ISBN ${cleanIsbn} en Open Library.`);
+      let autor = book.by_statement || '';
+      if (!autor && Array.isArray(book.authors) && book.authors.length > 0) {
+        try {
+          const authorKey = book.authors[0].key;
+          if (authorKey) {
+            const authorRes = await fetch(`https://openlibrary.org${authorKey}.json`);
+            if (authorRes.ok) {
+              const authorData = await authorRes.json();
+              autor = authorData.name || authorData.personal_name || '';
+            }
+          }
+        } catch {
+          // Mantener autor vacío si falla la subconsulta
+        }
+      }
+      if (!autor) {
+        autor = 'Autor desconocido';
+      }
+
+      let portadaUrl: string | null = null;
+      if (Array.isArray(book.covers) && book.covers.length > 0) {
+        portadaUrl = `https://covers.openlibrary.org/b/id/${book.covers[0]}-M.jpg`;
+      } else {
+        portadaUrl = `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`;
+      }
+
+      return {
+        isbn: cleanIsbn,
+        titulo,
+        autor,
+        portada_url: portadaUrl,
+      };
+    }
+  } catch (err) {
+    console.warn('Open Library direct ISBN falló...', err);
   }
 
-  const book = data[key];
-  const titulo = book.title || 'Título desconocido';
-  const autoresList = book.authors || [];
-  const autor = autoresList.map((a: { name: string }) => a.name).join(', ') || 'Autor desconocido';
-
-  let portadaUrl: string | null = null;
-  if (book.cover) {
-    portadaUrl = book.cover.large || book.cover.medium || book.cover.small || null;
-  }
-  if (portadaUrl && portadaUrl.startsWith('http://')) {
-    portadaUrl = portadaUrl.replace('http://', 'https://');
-  }
-
-  return {
-    isbn: cleanIsbn,
-    titulo,
-    autor,
-    portada_url: portadaUrl,
-  };
+  throw new Error(
+    `No se encontró información para el ISBN "${cleanIsbn}" en Open Library. Puedes registrar el libro con este ISBN de forma manual.`
+  );
 }
 
 export function resetToSeedData(): void {

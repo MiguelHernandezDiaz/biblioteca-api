@@ -44,6 +44,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
   // Found book state
   const [foundBook, setFoundBook] = useState<OpenLibraryResult | null>(null);
+  const [bookTitle, setBookTitle] = useState('');
+  const [bookAuthor, setBookAuthor] = useState('');
+  const [bookCoverUrl, setBookCoverUrl] = useState('');
   const [copias, setCopias] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -148,12 +151,31 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     try {
       const result = await searchOpenLibrary(isbn);
       setFoundBook(result);
+      setBookTitle(result.titulo);
+      setBookAuthor(result.autor);
+      setBookCoverUrl(result.portada_url || '');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al buscar libro';
       setErrorMessage(msg);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const startManualEntry = (isbn: string) => {
+    const clean = isbn.replace(/[-\s]/g, '').trim();
+    setErrorMessage(null);
+    setSaveSuccess(false);
+    setFoundBook({
+      isbn: clean || 'S/N',
+      titulo: '',
+      autor: '',
+      portada_url: clean ? `https://covers.openlibrary.org/b/isbn/${clean}-M.jpg` : null,
+    });
+    setBookTitle('');
+    setBookAuthor('');
+    setBookCoverUrl(clean ? `https://covers.openlibrary.org/b/isbn/${clean}-M.jpg` : '');
+    setCopias(1);
   };
 
   const handleManualSearch = (e: React.FormEvent) => {
@@ -165,20 +187,31 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
   const handleSaveBook = async () => {
     if (!foundBook) return;
+    if (!bookTitle.trim()) {
+      setErrorMessage('Por favor ingresa un título para el libro.');
+      return;
+    }
+    if (!bookAuthor.trim()) {
+      setErrorMessage('Por favor ingresa el autor del libro.');
+      return;
+    }
 
     setIsSaving(true);
     try {
       await onBookAdded({
-        titulo: foundBook.titulo,
-        autor: foundBook.autor,
+        titulo: bookTitle.trim(),
+        autor: bookAuthor.trim(),
         isbn: foundBook.isbn,
         copias_totales: Number(copias) || 1,
-        portada_url: foundBook.portada_url || undefined,
+        portada_url: bookCoverUrl.trim() || undefined,
       });
 
       setSaveSuccess(true);
       setFoundBook(null);
       setManualIsbn('');
+      setBookTitle('');
+      setBookAuthor('');
+      setBookCoverUrl('');
       setCopias(1);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al guardar el libro';
@@ -359,12 +392,24 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           
           {/* Error Message */}
           {errorMessage && (
-            <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 flex items-start gap-3 text-xs text-rose-300">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-400" />
-              <div>
-                <span className="font-semibold block text-rose-200">Aviso</span>
-                {errorMessage}
+            <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 space-y-3 text-xs text-rose-300">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-400" />
+                <div className="space-y-1">
+                  <span className="font-semibold block text-rose-200">Aviso</span>
+                  <p>{errorMessage}</p>
+                </div>
               </div>
+              {manualIsbn.trim() && (
+                <button
+                  type="button"
+                  onClick={() => startManualEntry(manualIsbn.trim())}
+                  className="w-full py-2 bg-rose-900/60 hover:bg-rose-850 border border-rose-700/60 text-rose-100 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow"
+                >
+                  <BookPlus className="w-3.5 h-3.5" />
+                  <span>Registrar libro con este ISBN manualmente</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -388,13 +433,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             </div>
           )}
 
-          {/* Result Card from Open Library */}
+          {/* Result Card: Open Library or Manual Draft */}
           {foundBook ? (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/50">
                   <Sparkles className="w-3 h-3" />
-                  <span>Encontrado en Open Library</span>
+                  <span>{foundBook.titulo ? 'Ficha de Open Library' : 'Registro Manual'}</span>
                 </span>
                 <span className="text-xs font-mono text-slate-400">
                   ISBN: {foundBook.isbn}
@@ -403,27 +448,44 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
               <div className="flex gap-4 items-start">
                 <div className="w-24 h-36 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center flex-shrink-0 shadow-md">
-                  {foundBook.portada_url ? (
+                  {bookCoverUrl ? (
                     <img
-                      src={foundBook.portada_url}
-                      alt={foundBook.titulo}
+                      src={bookCoverUrl}
+                      alt={bookTitle || 'Portada'}
                       className="w-full h-full object-cover"
+                      onError={() => setBookCoverUrl('')}
                     />
                   ) : (
                     <Book className="w-8 h-8 text-slate-700" />
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <h3 className="text-base font-bold text-white leading-snug">
-                    {foundBook.titulo}
-                  </h3>
-                  <p className="text-xs text-slate-300">
-                    <strong className="text-slate-400">Autor:</strong> {foundBook.autor}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    <strong className="text-slate-500">ISBN:</strong> {foundBook.isbn}
-                  </p>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                      Título:
+                    </label>
+                    <input
+                      type="text"
+                      value={bookTitle}
+                      onChange={(e) => setBookTitle(e.target.value)}
+                      placeholder="Título del libro"
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                      Autor(es):
+                    </label>
+                    <input
+                      type="text"
+                      value={bookAuthor}
+                      onChange={(e) => setBookAuthor(e.target.value)}
+                      placeholder="Nombre del autor"
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -439,18 +501,33 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     max="50"
                     value={copias}
                     onChange={(e) => setCopias(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
-                <button
-                  onClick={handleSaveBook}
-                  disabled={isSaving}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-700/20 disabled:opacity-50"
-                >
-                  <BookPlus className="w-4 h-4" />
-                  <span>{isSaving ? 'Guardando...' : 'Agregar al Inventario'}</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFoundBook(null);
+                      setBookTitle('');
+                      setBookAuthor('');
+                      setBookCoverUrl('');
+                    }}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveBook}
+                    disabled={isSaving || !bookTitle.trim() || !bookAuthor.trim()}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-700/20 disabled:opacity-50"
+                  >
+                    <BookPlus className="w-4 h-4" />
+                    <span>{isSaving ? 'Guardando...' : 'Agregar al Inventario'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
