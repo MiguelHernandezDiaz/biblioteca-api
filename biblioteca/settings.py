@@ -101,6 +101,15 @@ CORS_ALLOW_CREDENTIALS = True
 # Allow URLs with or without trailing slash
 APPEND_SLASH = False
 
+# Proxy & SSL configuration for Nginx
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = [
+    'https://localhost',
+    'http://localhost',
+    'https://127.0.0.1',
+    'http://127.0.0.1',
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',

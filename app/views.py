@@ -202,45 +202,66 @@ def devolver_prestamo(request, pk):
 @api_view(['GET'])
 def buscar_en_open_library(request, isbn):
     """
-    Consulta directamente la API pública de Open Library usando el ISBN.
+    Consulta la API pública de Open Library usando el ISBN.
+    Utiliza el endpoint moderno de búsqueda y respaldo canónico para garantizar disponibilidad.
     """
-    isbn_limpio = isbn.replace("-", "").strip()
-    url = f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn_limpio}&format=json&jscmd=data"
+    isbn_limpio = isbn.replace("-", "").replace(" ", "").strip()
+    if not isbn_limpio:
+        return Response(
+            {"detail": "El código ISBN no puede estar vacío."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
+    headers = {'User-Agent': 'BibliotecaGestion/1.0 (admin@biblioteca.local)'}
+
+    # 1. Búsqueda por search.json
     try:
-        response = requests.get(url, timeout=5)
-        if response.status_code != 200:
-            return Response(
-                {"detail": f"Error al conectar con Open Library (Código: {response.status_code})"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        search_url = f"https://openlibrary.org/search.json?isbn={isbn_limpio}&limit=1"
+        response = requests.get(search_url, headers=headers, timeout=6)
+        if response.status_code == 200:
+            data = response.json()
+            docs = data.get("docs", [])
+            if docs:
+                doc = docs[0]
+                titulo = doc.get("title", "Título desconocido")
+                autores_list = doc.get("author_name", [])
+                autor = ", ".join(autores_list) if autores_list else doc.get("by_statement", "Autor desconocido")
+                cover_i = doc.get("cover_i")
+                portada_url = f"https://covers.openlibrary.org/b/id/{cover_i}-M.jpg" if cover_i else f"https://covers.openlibrary.org/b/isbn/{isbn_limpio}-M.jpg"
 
-        data = response.json()
-        key = f"ISBN:{isbn_limpio}"
+                return Response({
+                    "isbn": isbn_limpio,
+                    "titulo": titulo,
+                    "autor": autor,
+                    "portada_url": portada_url
+                })
+    except requests.exceptions.Timeout:
+        pass
+    except requests.exceptions.RequestException:
+        pass
 
-        if key not in data:
+    # 2. Respaldo por endpoint directo de ISBN
+    try:
+        direct_url = f"https://openlibrary.org/isbn/{isbn_limpio}.json"
+        response = requests.get(direct_url, headers=headers, timeout=6, allow_redirects=True)
+        if response.status_code == 200:
+            book = response.json()
+            titulo = book.get("title", "Título desconocido")
+            autor = book.get("by_statement", "Autor desconocido")
+            covers = book.get("covers", [])
+            portada_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-M.jpg" if covers else f"https://covers.openlibrary.org/b/isbn/{isbn_limpio}-M.jpg"
+
+            return Response({
+                "isbn": isbn_limpio,
+                "titulo": titulo,
+                "autor": autor,
+                "portada_url": portada_url
+            })
+        elif response.status_code == 404:
             return Response(
-                {"detail": "No se encontró ningún libro con este ISBN en Open Library."},
+                {"detail": f"No se encontró ningún libro con el ISBN {isbn_limpio} en Open Library."},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-        libro_info = data[key]
-        titulo = libro_info.get("title", "Título desconocido")
-        autores_list = libro_info.get("authors", [])
-        autor = ", ".join([a.get("name") for a in autores_list]) if autores_list else "Autor desconocido"
-
-        portada_dict = libro_info.get("cover", {})
-        portada_url = portada_dict.get("large", portada_dict.get("medium", portada_dict.get("small", None)))
-
-        if portada_url and portada_url.startswith("http://"):
-            portada_url = portada_url.replace("http://", "https://")
-
-        return Response({
-            "isbn": isbn_limpio,
-            "titulo": titulo,
-            "autor": autor,
-            "portada_url": portada_url
-        })
     except requests.exceptions.Timeout:
         return Response(
             {"detail": "Tiempo de espera agotado al conectar con Open Library."},
@@ -248,9 +269,14 @@ def buscar_en_open_library(request, isbn):
         )
     except requests.exceptions.RequestException as e:
         return Response(
-            {"detail": f"Error de red o de comunicación: {str(e)}"},
+            {"detail": f"Error de red o comunicación: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+    return Response(
+        {"detail": f"No se encontró ningún libro con el ISBN {isbn_limpio} en Open Library."},
+        status=status.HTTP_404_NOT_FOUND
+    )
 
 
 # ==================== SCANNER HTML ====================
