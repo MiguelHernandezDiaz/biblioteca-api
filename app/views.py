@@ -1,7 +1,6 @@
 import os
 import sys
 import requests
-import pkg_resources
 from datetime import date, timedelta
 from django.db import connection
 from django.http import HttpResponse, FileResponse, JsonResponse
@@ -62,11 +61,13 @@ def root(request):
 
     app_index = os.path.join(os.path.dirname(__file__), 'index.html')
     if os.path.exists(app_index):
-        return FileResponse(open(app_index, 'rb'), content_type='text/html')
+        with open(app_index, 'r', encoding='utf-8') as f:
+            return HttpResponse(f.read(), content_type='text/html; charset=utf-8')
 
     dist_index = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dist', 'index.html')
     if os.path.exists(dist_index):
-        return FileResponse(open(dist_index, 'rb'), content_type='text/html')
+        with open(dist_index, 'r', encoding='utf-8') as f:
+            return HttpResponse(f.read(), content_type='text/html; charset=utf-8')
 
     return JsonResponse({
         "mensaje": "Biblioteca API",
@@ -800,4 +801,7 @@ def buscar_en_open_library(request, isbn):
 
 def scanner_view(request):
     scanner_path = os.path.join(os.path.dirname(__file__), "scanner.html")
-    return FileResponse(open(scanner_path, "rb"), content_type="text/html")
+    if os.path.exists(scanner_path):
+        with open(scanner_path, "r", encoding="utf-8") as f:
+            return HttpResponse(f.read(), content_type="text/html; charset=utf-8")
+    return HttpResponse("Escáner no encontrado.", content_type="text/plain", status=404)

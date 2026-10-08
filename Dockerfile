@@ -11,5 +11,5 @@ RUN chmod +x /code/entrypoint.sh 2>/dev/null || true
 
 EXPOSE 8000
 
-ENTRYPOINT ["/bin/sh", "/code/entrypoint.sh"]
+CMD ["/bin/sh", "/code/entrypoint.sh"]
 
