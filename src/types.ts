@@ -13,6 +13,7 @@ export interface Usuario {
   id: number;
   nombre: string;
   email: string;
+  rol?: 'usuario' | 'admin';
   activo: boolean;
 }
 
@@ -26,6 +27,8 @@ export interface Prestamo {
   activo: boolean;
   libro?: Libro;
   usuario?: Usuario;
+  dias_restantes?: number;
+  estado_plazo?: string;
 }
 
 export interface OpenLibraryResult {
@@ -33,4 +36,12 @@ export interface OpenLibraryResult {
   titulo: string;
   autor: string;
   portada_url: string | null;
+}
+
+export interface AuthUser {
+  id: number;
+  nombre: string;
+  email: string;
+  rol: 'usuario' | 'admin';
+  token?: string;
 }

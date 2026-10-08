@@ -14,7 +14,7 @@ class LibroSerializer(serializers.ModelSerializer):
             'portada_url',
             'activo',
         ]
-        read_only_fields = ['id', 'copias_disponibles', 'activo']
+        read_only_fields = ['id', 'activo']
 
     def create(self, validated_data):
         copias_totales = validated_data.get('copias_totales', 1)
@@ -24,9 +24,11 @@ class LibroSerializer(serializers.ModelSerializer):
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False, default='123456')
+
     class Meta:
         model = Usuario
-        fields = ['id', 'nombre', 'email', 'activo']
+        fields = ['id', 'nombre', 'email', 'rol', 'activo', 'password']
         read_only_fields = ['id', 'activo']
 
 
@@ -42,9 +44,17 @@ class PrestamoSerializer(serializers.ModelSerializer):
         write_only=True
     )
 
-    # Output fields matching previous FastAPI schema
     libro_id_out = serializers.IntegerField(source='libro.id', read_only=True)
     usuario_id_out = serializers.IntegerField(source='usuario.id', read_only=True)
+
+    libro_titulo = serializers.CharField(source='libro.titulo', read_only=True)
+    libro_autor = serializers.CharField(source='libro.autor', read_only=True)
+    libro_portada = serializers.CharField(source='libro.portada_url', read_only=True)
+    libro_isbn = serializers.CharField(source='libro.isbn', read_only=True)
+    usuario_nombre = serializers.CharField(source='usuario.nombre', read_only=True)
+    usuario_email = serializers.CharField(source='usuario.email', read_only=True)
+    dias_restantes = serializers.IntegerField(read_only=True)
+    estado_plazo = serializers.CharField(read_only=True)
 
     class Meta:
         model = Prestamo
@@ -54,16 +64,23 @@ class PrestamoSerializer(serializers.ModelSerializer):
             'usuario_id',
             'libro_id_out',
             'usuario_id_out',
+            'libro_titulo',
+            'libro_autor',
+            'libro_portada',
+            'libro_isbn',
+            'usuario_nombre',
+            'usuario_email',
             'fecha_prestamo',
             'fecha_limite',
             'fecha_devolucion',
+            'dias_restantes',
+            'estado_plazo',
             'activo',
         ]
-        read_only_fields = ['id', 'fecha_prestamo', 'fecha_devolucion', 'activo']
+        read_only_fields = ['id', 'fecha_prestamo', 'fecha_devolucion', 'activo', 'dias_restantes', 'estado_plazo']
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        # Ensure flat libro_id and usuario_id match FastAPI schema
         data['libro_id'] = instance.libro_id
         data['usuario_id'] = instance.usuario_id
         data.pop('libro_id_out', None)

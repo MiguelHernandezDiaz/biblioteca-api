@@ -3,8 +3,11 @@ import { Header } from './components/Header';
 import { BooksView } from './components/BooksView';
 import { UsersView } from './components/UsersView';
 import { LoansView } from './components/LoansView';
+import { MyLoansView } from './components/MyLoansView';
 import { ScannerView } from './components/ScannerView';
-import { Libro, Usuario, Prestamo } from './types';
+import { DatabaseInspectorView } from './components/DatabaseInspectorView';
+import { AuthModals } from './components/AuthModals';
+import { Libro, Usuario, Prestamo, AuthUser } from './types';
 import {
   fetchLibros,
   fetchUsuarios,
@@ -25,11 +28,23 @@ interface Toast {
 }
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'books' | 'users' | 'loans' | 'scanner'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'my-loans' | 'loans' | 'users' | 'scanner' | 'database'>('books');
   const [libros, setLibros] = useState<Libro[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('biblioteca_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
 
   // Preselection for loans modal
   const [preSelectedBookId, setPreSelectedBookId] = useState<number | null>(null);
@@ -48,6 +63,31 @@ export const App: React.FC = () => {
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleLoginSuccess = (user: AuthUser) => {
+    setCurrentUser(user);
+    localStorage.setItem('biblioteca_auth_user', JSON.stringify(user));
+    addToast('success', `¡Bienvenido/a, ${user.nombre}!`);
+    if (user.rol === 'admin') {
+      setActiveTab('books');
+    } else {
+      setActiveTab('my-loans');
+    }
+  };
+
+  const handleRegisterSuccess = (user: AuthUser) => {
+    setCurrentUser(user);
+    localStorage.setItem('biblioteca_auth_user', JSON.stringify(user));
+    addToast('success', `¡Cuenta creada con éxito! Bienvenido/a, ${user.nombre}.`);
+    setActiveTab('books');
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('biblioteca_auth_user');
+    addToast('info', 'Sesión cerrada correctamente.');
+    setActiveTab('books');
   };
 
   const loadAllData = useCallback(async () => {
@@ -80,6 +120,10 @@ export const App: React.FC = () => {
     copias_totales: number;
     portada_url?: string;
   }) => {
+    if (currentUser?.rol !== 'admin') {
+      addToast('error', 'Acción denegada: Solo el Administrador puede registrar libros.');
+      return;
+    }
     try {
       await createLibro(bookData);
       await loadAllData();
@@ -92,6 +136,10 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteBook = async (id: number) => {
+    if (currentUser?.rol !== 'admin') {
+      addToast('error', 'Acción denegada: Solo el Administrador puede eliminar libros.');
+      return;
+    }
     try {
       await deleteLibro(id);
       await loadAllData();
@@ -103,13 +151,21 @@ export const App: React.FC = () => {
   };
 
   const handleStartLoanForBook = (libro: Libro) => {
+    if (!currentUser) {
+      setLoginModalOpen(true);
+      return;
+    }
     setPreSelectedBookId(libro.id);
-    setPreSelectedUserId(null);
+    setPreSelectedUserId(currentUser.id);
     setActiveTab('loans');
   };
 
   // User Handlers
   const handleCreateUser = async (userData: { nombre: string; email: string }) => {
+    if (currentUser?.rol !== 'admin') {
+      addToast('error', 'Solo el Administrador puede dar de alta usuarios directamente.');
+      return;
+    }
     try {
       await createUsuario(userData);
       await loadAllData();
@@ -139,6 +195,9 @@ export const App: React.FC = () => {
       setPreSelectedBookId(null);
       setPreSelectedUserId(null);
       addToast('success', 'Préstamo registrado exitosamente.');
+      if (currentUser?.rol !== 'admin') {
+        setActiveTab('my-loans');
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al crear préstamo';
       addToast('error', msg);
@@ -157,17 +216,14 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleReset = () => {
-    resetToSeedData();
-    loadAllData();
-    addToast('info', 'Datos restablecidos a los valores de demostración.');
-  };
-
   // Stats calculation
   const totalBooks = libros.length;
   const availableCopies = libros.reduce((acc, curr) => acc + curr.copias_disponibles, 0);
   const totalUsers = usuarios.length;
   const activeLoans = prestamos.filter((p) => p.activo).length;
+  const myActiveLoans = currentUser
+    ? prestamos.filter((p) => p.usuario_id === currentUser.id && p.activo).length
+    : 0;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -184,8 +240,12 @@ export const App: React.FC = () => {
           availableCopies,
           totalUsers,
           activeLoans,
+          myActiveLoans,
         }}
-        onResetData={handleReset}
+        currentUser={currentUser}
+        onOpenLogin={() => setLoginModalOpen(true)}
+        onOpenRegister={() => setRegisterModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Container */}
@@ -200,19 +260,22 @@ export const App: React.FC = () => {
             {activeTab === 'books' && (
               <BooksView
                 libros={libros}
+                currentUser={currentUser}
                 onDeleteBook={handleDeleteBook}
                 onCreateBook={handleCreateBook}
                 onStartLoan={handleStartLoanForBook}
                 onGoToScanner={() => setActiveTab('scanner')}
+                onOpenLogin={() => setLoginModalOpen(true)}
               />
             )}
 
-            {activeTab === 'users' && (
-              <UsersView
-                usuarios={usuarios}
+            {activeTab === 'my-loans' && (
+              <MyLoansView
                 prestamos={prestamos}
-                onCreateUser={handleCreateUser}
-                onNewLoanForUser={handleNewLoanForUser}
+                currentUser={currentUser}
+                onReturnLoan={handleReturnLoan}
+                onExploreCatalog={() => setActiveTab('books')}
+                onOpenLogin={() => setLoginModalOpen(true)}
               />
             )}
 
@@ -228,42 +291,67 @@ export const App: React.FC = () => {
               />
             )}
 
+            {activeTab === 'users' && (
+              <UsersView
+                usuarios={usuarios}
+                prestamos={prestamos}
+                onCreateUser={handleCreateUser}
+                onNewLoanForUser={handleNewLoanForUser}
+              />
+            )}
+
             {activeTab === 'scanner' && (
               <ScannerView
                 onBookAdded={handleCreateBook}
                 onGoToCatalog={() => setActiveTab('books')}
               />
             )}
+
+            {activeTab === 'database' && (
+              <DatabaseInspectorView />
+            )}
           </>
         )}
       </main>
 
-      {/* Toast Notifications */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-        {toasts.map((t) => (
+      {/* Auth Modals */}
+      <AuthModals
+        loginOpen={loginModalOpen}
+        registerOpen={registerModalOpen}
+        onCloseLogin={() => setLoginModalOpen(false)}
+        onCloseRegister={() => setRegisterModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+        onRegisterSuccess={handleRegisterSuccess}
+      />
+
+      {/* Floating Toast Notification Stack */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+        {toasts.map((toast) => (
           <div
-            key={t.id}
-            className={`pointer-events-auto p-3.5 rounded-xl border shadow-xl flex items-start gap-3 text-xs transition-all animate-[slideIn_0.2s_ease-out] ${
-              t.type === 'success'
-                ? 'bg-emerald-950/95 border-emerald-800 text-emerald-200'
-                : t.type === 'error'
-                ? 'bg-rose-950/95 border-rose-800 text-rose-200'
-                : 'bg-slate-900/95 border-slate-800 text-slate-200'
+            key={toast.id}
+            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border text-xs shadow-xl transition-all duration-300 ${
+              toast.type === 'success'
+                ? 'bg-slate-900/95 border-emerald-500/50 text-emerald-200'
+                : toast.type === 'error'
+                ? 'bg-slate-900/95 border-rose-500/50 text-rose-200'
+                : 'bg-slate-900/95 border-blue-500/50 text-blue-200'
             }`}
           >
-            {t.type === 'success' && (
+            {toast.type === 'success' && (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
             )}
-            {t.type === 'error' && (
+            {toast.type === 'error' && (
               <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
             )}
-            {t.type === 'info' && (
+            {toast.type === 'info' && (
               <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
             )}
-            <p className="flex-1 font-medium leading-relaxed">{t.message}</p>
+
+            <div className="flex-1 font-medium leading-relaxed">{toast.message}</div>
+
             <button
-              onClick={() => removeToast(t.id)}
-              className="text-slate-400 hover:text-white p-0.5"
+              onClick={() => removeToast(toast.id)}
+              className="text-slate-400 hover:text-slate-200 p-0.5 -mr-1 -mt-1 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
