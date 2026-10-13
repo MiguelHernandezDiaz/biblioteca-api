@@ -5,9 +5,10 @@ from datetime import date, timedelta
 from django.db import connection
 from django.http import HttpResponse, FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
+from django.views.decorators.csrf import csrf_exempt
 
 from app.models import Libro, Usuario, Prestamo
 from app.serializers import LibroSerializer, UsuarioSerializer, PrestamoSerializer
@@ -77,7 +78,10 @@ def root(request):
 
 # ==================== AUTENTICACIÓN ====================
 
+@csrf_exempt
 @api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
 def auth_login(request):
     """
     Inicio de sesión para Usuarios Lectores y Administrador.
@@ -129,7 +133,10 @@ def auth_login(request):
     })
 
 
+@csrf_exempt
 @api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
 def auth_register(request):
     """
     Registro libre de un nuevo usuario lector.

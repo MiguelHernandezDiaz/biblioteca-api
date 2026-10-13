@@ -863,8 +863,27 @@
       }
     }
 
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
     function getAuthHeaders() {
       const headers = { 'Content-Type': 'application/json' };
+      const csrf = getCookie('csrftoken');
+      if (csrf) {
+        headers['X-CSRFToken'] = csrf;
+      }
       if (state.currentUser) {
         if (state.currentUser.rol === 'admin') {
           headers['X-Role'] = 'admin';
@@ -1512,9 +1531,13 @@
 
     async function executeLogin(email, password) {
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        const csrf = getCookie('csrftoken');
+        if (csrf) headers['X-CSRFToken'] = csrf;
+
         const res = await fetch('/auth/login/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ email, password })
         });
         const data = await res.json();
@@ -1546,9 +1569,13 @@
       const password = document.getElementById('reg-password').value;
 
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        const csrf = getCookie('csrftoken');
+        if (csrf) headers['X-CSRFToken'] = csrf;
+
         const res = await fetch('/auth/register/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ nombre, email, password })
         });
         const data = await res.json();
