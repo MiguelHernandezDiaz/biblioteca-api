@@ -18,6 +18,7 @@ urlpatterns = [
 
     # Libros
     re_path(r'^(?:api/)?libros/?$', views.libros_list, name='libros_list'),
+    re_path(r'^(?:api/)?libros/sincronizar-inventario/?$', views.libros_sincronizar_inventario, name='libros_sincronizar_inventario'),
     re_path(r'^(?:api/)?libros/(?P<pk>\d+)/?$', views.libro_detail, name='libro_detail'),
 
     # Usuarios

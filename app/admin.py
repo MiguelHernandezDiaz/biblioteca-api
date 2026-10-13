@@ -10,6 +10,23 @@ class LibroAdmin(admin.ModelAdmin):
     search_fields = ('titulo', 'autor', 'isbn')
     ordering = ('titulo',)
     readonly_fields = ('copias_disponibles',)
+    actions = ['recalcular_disponibilidad_admin']
+
+    def recalcular_disponibilidad_admin(self, request, queryset):
+        count = 0
+        for libro in queryset:
+            libro.recalcular_disponibilidad()
+            libro.save()
+            count += 1
+        messages.success(request, f"Se sincronizaron las copias disponibles para {count} libro(s).")
+    recalcular_disponibilidad_admin.short_description = 'Recalcular y sincronizar copias disponibles con préstamos'
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.copias_disponibles = obj.copias_totales
+        else:
+            obj.recalcular_disponibilidad()
+        super().save_model(request, obj, form, change)
 
     def disponibilidad_display(self, obj):
         if obj.copias_disponibles > 0:

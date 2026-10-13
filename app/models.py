@@ -19,6 +19,24 @@ class Libro(models.Model):
     def __str__(self):
         return f"{self.titulo} ({self.isbn}) [{self.copias_disponibles}/{self.copias_totales} disp.]"
 
+    def recalcular_disponibilidad(self):
+        """
+        Sincroniza las copias disponibles según copias totales y préstamos activos.
+        """
+        if self.pk:
+            prestamos_activos = self.prestamos.filter(activo=True).count()
+            self.copias_disponibles = max(0, self.copias_totales - prestamos_activos)
+        else:
+            self.copias_disponibles = self.copias_totales
+        return self.copias_disponibles
+
+    def save(self, *args, **kwargs):
+        # Al crear un libro nuevo
+        if not self.pk:
+            if not self.copias_disponibles or (self.copias_disponibles == 1 and self.copias_totales > 1):
+                self.copias_disponibles = self.copias_totales
+        super().save(*args, **kwargs)
+
     def delete(self, *args, **kwargs):
         # Regla de integridad: No se puede borrar si tiene préstamos activos
         if self.prestamos.filter(activo=True).exists():

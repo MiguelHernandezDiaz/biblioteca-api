@@ -58,9 +58,9 @@
                 <h1 class="text-base sm:text-lg font-bold text-white tracking-tight leading-none">
                   Biblioteca
                 </h1>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                  PostgreSQL 16
-                </span>
+                <button onclick="switchTab('db')" title="Ver inspección de tablas y dependencias de PostgreSQL" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 hover:bg-emerald-900/60 transition-colors cursor-pointer">
+                  PostgreSQL 16 ↗
+                </button>
               </div>
               <p class="text-[11px] text-slate-400 mt-0.5">
                 Portal de Lectores &amp; Administración (Django API)
@@ -88,6 +88,11 @@
             <span id="badge-my-loans" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">0</span>
           </button>
 
+          <!-- Tab: PostgreSQL & Dependencias (Visible to all for evaluation/inspection) -->
+          <button id="tab-db" onclick="switchTab('db')" class="nav-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 border border-amber-800/40">
+            <span>🐘 PostgreSQL &amp; Deps</span>
+          </button>
+
           <!-- Admin-only tabs -->
           <div id="admin-tabs" class="hidden flex items-center gap-1.5">
             <button id="tab-loans-all" onclick="switchTab('loans-all')" class="nav-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/60">
@@ -102,10 +107,6 @@
 
             <button id="tab-scanner" onclick="switchTab('scanner')" class="nav-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 border border-emerald-800/40">
               <span>📷 Escáner ISBN</span>
-            </button>
-
-            <button id="tab-db" onclick="switchTab('db')" class="nav-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 border border-amber-800/40">
-              <span>🐘 PostgreSQL &amp; Deps</span>
             </button>
 
             <a href="/admin/" target="_blank" class="flex items-center gap-1 px-2.5 py-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg text-xs font-medium border border-slate-800 ml-1" title="Panel Django Oficial">
@@ -163,6 +164,9 @@
         
         <!-- Admin-only Add Book Button -->
         <div id="admin-book-actions" class="hidden flex items-center gap-2">
+          <button onclick="syncStock()" title="Sincronizar copias disponibles con préstamos activos" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs font-semibold transition-colors border border-slate-700 shadow-sm">
+            <span>🔄 Sincronizar Stock</span>
+          </button>
           <button onclick="switchTab('scanner')" class="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm">
             <span>📷 Escanear con Cámara</span>
           </button>
@@ -1477,6 +1481,21 @@
 
         closeModal('modal-book');
         showToast('success', `Libro "${titulo}" creado con ${copias} copias.`);
+        await loadData();
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    }
+
+    async function syncStock() {
+      try {
+        const res = await fetch('/libros/sincronizar-inventario/', {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || data.mensaje || 'Error al sincronizar');
+        showToast('success', data.mensaje || '¡Inventario y copias disponibles sincronizados!');
         await loadData();
       } catch (err) {
         showToast('error', err.message);

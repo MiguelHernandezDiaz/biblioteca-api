@@ -208,6 +208,29 @@ def libros_list(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+def libros_sincronizar_inventario(request):
+    """
+    Sincroniza y recalcula las copias disponibles de todos los libros del catálogo
+    comparándolas con sus préstamos activos pendientes de devolución.
+    """
+    libros = Libro.objects.filter(activo=True)
+    actualizados = 0
+    for libro in libros:
+        antes = libro.copias_disponibles
+        libro.recalcular_disponibilidad()
+        if libro.copias_disponibles != antes:
+            libro.save()
+            actualizados += 1
+
+    return Response({
+        "status": "success",
+        "mensaje": f"Se sincronizó el inventario. {actualizados} libro(s) corrigieron su disponibilidad.",
+        "libros_actualizados": actualizados,
+        "total_libros": libros.count()
+    }, status=status.HTTP_200_OK)
+
+
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 def libro_detail(request, pk):
     try:
@@ -230,10 +253,9 @@ def libro_detail(request, pk):
         # Ajuste de copias totales y disponibles
         copias_totales = request.data.get('copias_totales')
         if copias_totales is not None:
-            copias_totales = int(copias_totales)
-            diff = copias_totales - libro.copias_totales
-            libro.copias_totales = max(1, copias_totales)
-            libro.copias_disponibles = max(0, libro.copias_disponibles + diff)
+            copias_totales = max(1, int(copias_totales))
+            libro.copias_totales = copias_totales
+            libro.recalcular_disponibilidad()
 
         titulo = request.data.get('titulo')
         if titulo:
