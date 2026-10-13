@@ -506,7 +506,14 @@ def sistema_db_inspector(request):
     """
     Devuelve la información en vivo de las tablas de PostgreSQL, sus dependencias,
     recuento de registros y las dependencias de software instaladas.
+    Exclusivo para administradores.
     """
+    if not is_admin_request(request):
+        return Response(
+            {"detail": "Acceso denegado: La inspección de PostgreSQL y dependencias del sistema es exclusiva para administradores."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
     db_engine = connection.vendor
     db_name = connection.settings_dict.get('NAME', '')
     db_user = connection.settings_dict.get('USER', '')
@@ -648,6 +655,12 @@ def sistema_run_tests(request):
     4. Bloqueo de eliminación de libro con préstamo activo
     5. Desbloqueo de eliminación tras devolución
     """
+    if not is_admin_request(request):
+        return Response(
+            {"detail": "Acceso denegado: La ejecución de pruebas del sistema es exclusiva para administradores."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
     resultados = []
     hoy = date.today()
 

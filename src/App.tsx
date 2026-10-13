@@ -112,6 +112,12 @@ export const App: React.FC = () => {
     loadAllData();
   }, [loadAllData]);
 
+  useEffect(() => {
+    if (activeTab === 'database' && currentUser?.rol !== 'admin') {
+      setActiveTab('books');
+    }
+  }, [activeTab, currentUser]);
+
   // Book Handlers
   const handleCreateBook = async (bookData: {
     titulo: string;
@@ -308,7 +314,27 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'database' && (
-              <DatabaseInspectorView />
+              currentUser?.rol === 'admin' ? (
+                <DatabaseInspectorView />
+              ) : (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center max-w-md mx-auto space-y-4 my-8">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+                    <AlertCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Acceso Restringido</h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      El panel de PostgreSQL y Dependencias del Sistema está reservado exclusivamente para administradores.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('books')}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold"
+                  >
+                    Volver al Catálogo
+                  </button>
+                </div>
+              )
             )}
           </>
         )}

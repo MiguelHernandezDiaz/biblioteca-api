@@ -45,13 +45,12 @@ export const Header: React.FC<HeaderProps> = ({
                   <h1 className="text-base sm:text-lg font-bold text-white tracking-tight leading-none">
                     Biblioteca
                   </h1>
-                  <button
-                    onClick={() => setActiveTab('database')}
-                    title="Ver inspección de tablas y dependencias de PostgreSQL"
-                    className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 hover:bg-emerald-900/60 transition-colors cursor-pointer"
+                  <span
+                    className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60"
+                    title="Motor PostgreSQL 16"
                   >
-                    PostgreSQL 16 ↗
-                  </button>
+                    PostgreSQL 16
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Portal de Lectores &amp; Préstamos
@@ -119,19 +118,6 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* PostgreSQL & Dependencias (Visible to all) */}
-            <button
-              onClick={() => setActiveTab('database')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                activeTab === 'database'
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 border border-amber-800/40'
-              }`}
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span>PostgreSQL &amp; Deps</span>
-            </button>
-
             {/* Admin-only Tabs */}
             {isAdmin && (
               <>
@@ -175,6 +161,20 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>Escanear ISBN</span>
+                </button>
+
+                {/* PostgreSQL & Dependencias (Exclusivo Administrador) */}
+                <button
+                  onClick={() => setActiveTab('database')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                    activeTab === 'database'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 border border-amber-800/40'
+                  }`}
+                  title="Inspección de base de datos PostgreSQL y dependencias (Admin)"
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>🐘 PostgreSQL &amp; Deps</span>
                 </button>
 
                 <a
