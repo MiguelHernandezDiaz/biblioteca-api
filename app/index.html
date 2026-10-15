@@ -104,14 +104,10 @@
               <span>📷 Escáner ISBN</span>
             </button>
 
-            <!-- Tab: PostgreSQL & Dependencias (Exclusivo Administrador) -->
-            <button id="tab-db" onclick="switchTab('db')" class="nav-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 border border-amber-800/40" title="Inspección de base de datos PostgreSQL y dependencias (Admin)">
-              <span>🐘 PostgreSQL &amp; Deps</span>
+            <!-- Tab: PostgreSQL & Tablas de la BD (Exclusivo Administrador) -->
+            <button id="tab-db" onclick="switchTab('db')" class="nav-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 border border-amber-800/40" title="Inspección de las 3 tablas en PostgreSQL (Admin)">
+              <span>🐘 Tablas PostgreSQL</span>
             </button>
-
-            <a href="/admin/" target="_blank" class="flex items-center gap-1 px-2.5 py-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg text-xs font-medium border border-slate-800 ml-1" title="Panel Django Oficial">
-              <span>Django Admin ↗</span>
-            </a>
           </div>
         </nav>
 
@@ -372,21 +368,26 @@
       </div>
     </section>
 
-    <!-- ==================== VIEW 6: POSTGRESQL & DEPENDENCIAS (ADMIN ONLY) ==================== -->
+    <!-- ==================== VIEW 6: TABLAS POSTGRESQL (ADMIN ONLY) ==================== -->
     <section id="view-db" class="hidden space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
         <div>
           <div class="flex items-center gap-2">
-            <h2 class="text-xl font-bold text-white tracking-tight">PostgreSQL &amp; Dependencias del Sistema</h2>
-            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800/60">Inspector en Vivo</span>
+            <h2 class="text-xl font-bold text-white tracking-tight">PostgreSQL: Explorador de Tablas y Registros</h2>
+            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">Exclusivo Administrador</span>
           </div>
-          <p class="text-xs text-slate-400">Consulta las tablas relacionales, dependencias entre entidades y comandos de verificación en la terminal.</p>
+          <p class="text-xs text-slate-400 mt-1">Visualizador directo de las 3 tablas del dominio relacional: <strong class="text-slate-200">usuarios</strong>, <strong class="text-slate-200">libros</strong> y <strong class="text-slate-200">prestamos</strong>.</p>
         </div>
 
-        <!-- Run Automated Tests Button -->
-        <button onclick="runSystemTests()" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md">
-          <span>▶ Ejecutar Pruebas de Reglas de Negocio</span>
-        </button>
+        <div class="flex items-center gap-2.5">
+          <button onclick="loadDbInspector()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-all border border-slate-700">
+            <span>🔄 Actualizar</span>
+          </button>
+          <!-- Run Automated Tests Button -->
+          <button onclick="runSystemTests()" class="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md">
+            <span>▶ Verificar Integridad</span>
+          </button>
+        </div>
       </div>
 
       <!-- Test Execution Results Container -->
@@ -402,10 +403,10 @@
       </div>
 
       <!-- Server & DB Overview Card -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <span class="text-[10px] uppercase font-mono text-slate-500">Motor de Base de Datos</span>
-          <p class="text-sm font-bold text-white mt-1" id="db-engine-val">PostgreSQL</p>
+          <p class="text-sm font-bold text-white mt-1" id="db-engine-val">PostgreSQL 16</p>
           <span class="text-[10px] text-emerald-400 mt-1 block">● Conexión Activa</span>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -416,114 +417,59 @@
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <span class="text-[10px] uppercase font-mono text-slate-500">Host / Puerto</span>
           <p class="text-sm font-bold text-white mt-1" id="db-host-val">db:5432</p>
-          <span class="text-[10px] text-slate-400 mt-1 block">Docker Compose Network</span>
-        </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <span class="text-[10px] uppercase font-mono text-slate-500">Versión del Servidor</span>
-          <p class="text-xs font-mono text-slate-300 mt-1 truncate" id="db-version-val">PostgreSQL 16</p>
-          <span class="text-[10px] text-blue-400 mt-1 block">PostgreSQL Oficial</span>
+          <span class="text-[10px] text-slate-400 mt-1 block">Red Docker Compose</span>
         </div>
       </div>
 
-      <!-- Tables and Dependencies Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Main Database Inspector Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         
-        <!-- Table Records Card -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <h3 class="text-sm font-bold text-white flex items-center justify-between">
-            <span>Tablas en PostgreSQL (Recuento de Registros)</span>
-            <span class="text-xs text-slate-500 font-mono">public schema</span>
-          </h3>
+        <!-- Table Selector Tabs & Search Bar -->
+        <div class="border-b border-slate-800 bg-slate-950/60 p-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <!-- 3 Core Tables Tabs -->
+            <div class="flex items-center gap-2">
+              <button id="btn-tab-libros" onclick="selectDbTable('libros')" class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-sm">
+                <span>📚 libros</span>
+                <span id="db-badge-libros" class="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-blue-700 text-white">0</span>
+              </button>
+              <button id="btn-tab-usuarios" onclick="selectDbTable('usuarios')" class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
+                <span>👥 usuarios</span>
+                <span id="db-badge-usuarios" class="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-900 text-slate-400">0</span>
+              </button>
+              <button id="btn-tab-prestamos" onclick="selectDbTable('prestamos')" class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
+                <span>📋 prestamos</span>
+                <span id="db-badge-prestamos" class="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-900 text-slate-400">0</span>
+              </button>
+            </div>
 
-          <div id="db-tables-list" class="space-y-2.5">
+            <!-- Search in table -->
+            <div class="w-full sm:w-64">
+              <input
+                id="db-table-search"
+                type="text"
+                oninput="renderDbTableRows()"
+                placeholder="Buscar en registros..."
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <!-- Column schema definition chips -->
+          <div id="db-columns-bar" class="mt-3 pt-3 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 text-[11px] font-mono text-slate-400">
             <!-- Rendered by JS -->
           </div>
         </div>
 
-        <!-- Foreign Keys & Dependencies Map -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <h3 class="text-sm font-bold text-white flex items-center justify-between">
-            <span>Relaciones &amp; Dependencias (Claves Foráneas)</span>
-            <span class="text-xs text-slate-500 font-mono">FOREIGN KEY</span>
-          </h3>
-
-          <div id="db-dependencies-list" class="space-y-2.5">
-            <!-- Rendered by JS -->
-          </div>
-
-          <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1">
-            <p class="font-bold text-slate-300">Regla de Integridad Referencial:</p>
-            <p>La tabla <code class="text-amber-400 font-mono">prestamos</code> depende de <code class="text-blue-400 font-mono">libros</code> y <code class="text-emerald-400 font-mono">usuarios</code>. Por esta razón, el sistema bloquea el borrado de cualquier libro mientras existan préstamos activos vinculados a él.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Python Packages and Dependencies -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-        <h3 class="text-sm font-bold text-white flex items-center justify-between">
-          <span>Dependencias de Software (requirements.txt)</span>
-          <span class="text-xs text-slate-500 font-mono">Python 3.11</span>
-        </h3>
-        <div id="db-packages-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <!-- Records Table Container -->
+        <div id="db-records-container" class="overflow-x-auto">
           <!-- Rendered by JS -->
         </div>
-      </div>
 
-      <!-- Terminal Cheatsheet Card -->
-      <div class="bg-gradient-to-r from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-bold text-white">¿Cómo verificar la base de datos en la terminal?</h3>
-            <p class="text-xs text-slate-400">Comandos directos que puedes ejecutar en tu terminal / consola:</p>
-          </div>
-          <span class="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-slate-300">Bash / Docker</span>
-        </div>
-
-        <div class="space-y-3 text-xs font-mono">
-          <!-- Command 1 -->
-          <div class="bg-black/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
-            <div>
-              <span class="text-slate-500 block text-[10px]">1. Entrar al cliente interactivo psql de PostgreSQL:</span>
-              <code class="text-emerald-400 select-all">docker compose exec db psql -U biblioteca_user -d biblioteca_db</code>
-            </div>
-            <button onclick="copyCommand(this, 'docker compose exec db psql -U biblioteca_user -d biblioteca_db')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]">Copiar</button>
-          </div>
-
-          <!-- Command 2 -->
-          <div class="bg-black/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
-            <div>
-              <span class="text-slate-500 block text-[10px]">2. Listar todas las tablas y sus dueños (dentro de psql):</span>
-              <code class="text-emerald-400 select-all">\dt</code>
-            </div>
-            <button onclick="copyCommand(this, '\\dt')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]">Copiar</button>
-          </div>
-
-          <!-- Command 3 -->
-          <div class="bg-black/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
-            <div>
-              <span class="text-slate-500 block text-[10px]">3. Ver estructura detallada y columnas de la tabla libros:</span>
-              <code class="text-emerald-400 select-all">\d+ libros</code>
-            </div>
-            <button onclick="copyCommand(this, '\\d+ libros')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]">Copiar</button>
-          </div>
-
-          <!-- Command 4 -->
-          <div class="bg-black/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
-            <div>
-              <span class="text-slate-500 block text-[10px]">4. Ejecutar el comando inspector de Django:</span>
-              <code class="text-emerald-400 select-all">docker compose exec api python manage.py inspect_db</code>
-            </div>
-            <button onclick="copyCommand(this, 'docker compose exec api python manage.py inspect_db')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]">Copiar</button>
-          </div>
-
-          <!-- Command 5 -->
-          <div class="bg-black/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
-            <div>
-              <span class="text-slate-500 block text-[10px]">5. Ejecutar la suite de pruebas automatizadas de reglas:</span>
-              <code class="text-emerald-400 select-all">docker compose exec api python manage.py test app</code>
-            </div>
-            <button onclick="copyCommand(this, 'docker compose exec api python manage.py test app')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]">Copiar</button>
-          </div>
+        <!-- Footer counter -->
+        <div class="bg-slate-950 px-4 py-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
+          <span id="db-rows-counter">Mostrando 0 registros</span>
+          <span class="text-[11px] text-slate-500">Haz clic en "Ver" en cualquier fila para inspeccionar todos los campos y copiar en JSON.</span>
         </div>
       </div>
 
@@ -720,6 +666,36 @@
           Actualizar Libro
         </button>
       </form>
+    </div>
+  <!-- MODAL: DETALLE DE REGISTRO EN POSTGRESQL -->
+  <div id="modal-record-detail" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+        <h3 id="record-detail-title" class="text-sm font-bold text-white flex items-center gap-2">
+          <span>🐘 Detalle de Registro</span>
+        </h3>
+        <button onclick="closeModal('modal-record-detail')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-5">
+        <div>
+          <h4 class="text-xs uppercase font-mono font-bold text-slate-400 mb-2.5 tracking-wider">Campos y Valores en PostgreSQL:</h4>
+          <div id="record-detail-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider">Representación JSON (Respuesta REST API):</h4>
+            <button id="btn-copy-record-json" onclick="copyRecordJson()" class="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
+              Copiar JSON
+            </button>
+          </div>
+          <pre id="record-detail-json" class="p-3 bg-black/80 rounded-xl border border-slate-800 text-[11px] font-mono text-emerald-400 overflow-x-auto"></pre>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex justify-end">
+        <button onclick="closeModal('modal-record-detail')" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold">
+          Cerrar
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1636,58 +1612,250 @@
       switchTab('books');
     }
 
-    // ==================== 8. DB INSPECTOR & TESTS ====================
+    // ==================== 8. DB INSPECTOR (3 TABLAS PRINCIPALES) ====================
+    const DB_SCHEMAS = {
+      libros: [
+        { name: 'id', type: 'SERIAL (INT)', isPk: true },
+        { name: 'titulo', type: 'VARCHAR(255)' },
+        { name: 'autor', type: 'VARCHAR(255)' },
+        { name: 'isbn', type: 'VARCHAR(30) UNIQUE' },
+        { name: 'copias_totales', type: 'INTEGER' },
+        { name: 'copias_disponibles', type: 'INTEGER' },
+        { name: 'portada_url', type: 'TEXT NULL' },
+        { name: 'activo', type: 'BOOLEAN' }
+      ],
+      usuarios: [
+        { name: 'id', type: 'SERIAL (INT)', isPk: true },
+        { name: 'nombre', type: 'VARCHAR(150)' },
+        { name: 'email', type: 'VARCHAR(254) UNIQUE' },
+        { name: 'password', type: 'VARCHAR(128)' },
+        { name: 'rol', type: 'VARCHAR(20)' },
+        { name: 'activo', type: 'BOOLEAN' }
+      ],
+      prestamos: [
+        { name: 'id', type: 'SERIAL (INT)', isPk: true },
+        { name: 'libro_id', type: 'INTEGER (FK)', isFk: true },
+        { name: 'usuario_id', type: 'INTEGER (FK)', isFk: true },
+        { name: 'fecha_prestamo', type: 'DATE' },
+        { name: 'fecha_limite', type: 'DATE' },
+        { name: 'fecha_devolucion', type: 'DATE NULL' },
+        { name: 'activo', type: 'BOOLEAN' }
+      ]
+    };
+
+    let activeDbTable = 'libros';
+    let currentDbRows = [];
+    let currentRecordJson = '';
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function selectDbTable(tableName) {
+      activeDbTable = tableName;
+      ['libros', 'usuarios', 'prestamos'].forEach(t => {
+        const btn = document.getElementById(`btn-tab-${t}`);
+        if (!btn) return;
+        if (t === tableName) {
+          btn.className = 'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-sm';
+          const badge = document.getElementById(`db-badge-${t}`);
+          if (badge) badge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-blue-700 text-white';
+        } else {
+          btn.className = 'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white';
+          const badge = document.getElementById(`db-badge-${t}`);
+          if (badge) badge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-900 text-slate-400';
+        }
+      });
+
+      renderDbColumns();
+      renderDbTableRows();
+    }
+
+    function renderDbColumns() {
+      const container = document.getElementById('db-columns-bar');
+      if (!container) return;
+      const cols = DB_SCHEMAS[activeDbTable] || [];
+      container.innerHTML = `
+        <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Columnas:</span>
+        ${cols.map(c => `
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-900 border border-slate-800 whitespace-nowrap text-slate-300">
+            <strong class="${c.isPk ? 'text-amber-400' : c.isFk ? 'text-cyan-400' : 'text-white'}">${c.name}</strong>
+            <span class="text-[10px] text-slate-500">:${c.type}</span>
+          </span>
+        `).join('')}
+      `;
+    }
+
     async function loadDbInspector() {
       try {
         const res = await fetch('/sistema/db-inspector/', { headers: getAuthHeaders() });
         const data = await res.json();
         state.dbInspector = data;
 
-        document.getElementById('db-engine-val').innerText = data.motor === 'postgresql' ? 'PostgreSQL 16' : data.motor;
-        document.getElementById('db-name-val').innerText = data.base_datos || 'biblioteca_db';
-        document.getElementById('db-host-val').innerText = `${data.host || 'db'}:5432`;
-        document.getElementById('db-version-val').innerText = data.version_servidor || 'PostgreSQL 16';
+        const engineEl = document.getElementById('db-engine-val');
+        if (engineEl) engineEl.innerText = data.motor === 'postgresql' ? 'PostgreSQL 16' : (data.motor || 'PostgreSQL 16');
+        const nameEl = document.getElementById('db-name-val');
+        if (nameEl) nameEl.innerText = data.base_datos || 'biblioteca_db';
+        const hostEl = document.getElementById('db-host-val');
+        if (hostEl) hostEl.innerText = `${data.host || 'db'}:5432`;
 
-        // Render Tables
-        const tablesList = document.getElementById('db-tables-list');
-        tablesList.innerHTML = (data.tablas || []).map(t => `
-          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="text-sm">📁</span>
-              <div>
-                <span class="text-xs font-mono font-bold text-white block">${t.tabla}</span>
-                <span class="text-[10px] text-slate-400">${t.columnas ? t.columnas.length : 0} columnas</span>
-              </div>
-            </div>
-            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
-              ${t.registros} filas
-            </span>
-          </div>
-        `).join('');
+        // Update counts on tab buttons
+        if (data.tablas && Array.isArray(data.tablas)) {
+          data.tablas.forEach(t => {
+            const badge = document.getElementById(`db-badge-${t.tabla}`);
+            if (badge) {
+              badge.innerText = t.registros ?? (t.filas ? t.filas.length : 0);
+            }
+          });
+        }
 
-        // Render Dependencies
-        const depsList = document.getElementById('db-dependencies-list');
-        depsList.innerHTML = (data.dependencias_tablas || []).map(d => `
-          <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs font-mono flex items-center gap-2">
-            <span class="text-amber-400">🔗</span>
-            <span class="text-slate-300">${d.descripcion || `${d.origen} -> ${d.destino}`}</span>
-          </div>
-        `).join('');
-
-        // Render Packages
-        const pkgsList = document.getElementById('db-packages-list');
-        pkgsList.innerHTML = (data.paquetes_python || []).map(p => `
-          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-mono font-bold text-white">${p.nombre}</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">v${p.version}</span>
-            </div>
-            <p class="text-[11px] text-slate-400">${p.descripcion}</p>
-          </div>
-        `).join('');
-
+        renderDbColumns();
+        renderDbTableRows();
       } catch (err) {
         console.error('Error al inspeccionar DB:', err);
+        renderDbColumns();
+        renderDbTableRows();
+      }
+    }
+
+    function renderDbTableRows() {
+      const container = document.getElementById('db-records-container');
+      const counter = document.getElementById('db-rows-counter');
+      if (!container) return;
+
+      const cols = DB_SCHEMAS[activeDbTable] || [];
+      let rows = [];
+
+      // Get rows from dbInspector or fallback to state
+      if (state.dbInspector && state.dbInspector.tablas) {
+        const found = state.dbInspector.tablas.find(t => t.tabla === activeDbTable);
+        if (found && Array.isArray(found.filas) && found.filas.length > 0) {
+          rows = found.filas;
+        }
+      }
+      if (rows.length === 0 && state[activeDbTable]) {
+        rows = state[activeDbTable];
+      }
+
+      // Filter by search
+      const search = (document.getElementById('db-table-search')?.value || '').toLowerCase().trim();
+      const filtered = search
+        ? rows.filter(r => Object.values(r).some(v => v !== null && v !== undefined && String(v).toLowerCase().includes(search)))
+        : rows;
+
+      currentDbRows = filtered;
+
+      if (counter) {
+        counter.innerHTML = `Mostrando <strong class="text-white">${filtered.length}</strong> de <strong class="text-white">${rows.length}</strong> registros en tabla <code class="text-amber-400 font-mono font-bold">${activeDbTable}</code>`;
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-slate-500 text-xs">
+            No se encontraron registros en la tabla <strong class="text-slate-300">${activeDbTable}</strong>${search ? ` para "${search}"` : ''}.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800 tracking-wider">
+            <tr>
+              ${cols.map(c => `<th class="px-4 py-3 font-semibold">${c.name}</th>`).join('')}
+              <th class="px-4 py-3 text-right">Detalle</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/60 font-sans">
+            ${filtered.map((row, idx) => `
+              <tr class="hover:bg-slate-800/40 transition-colors cursor-pointer" onclick="inspectDbRecord(${idx})">
+                ${cols.map(c => {
+                  const val = row[c.name];
+                  if (c.name === 'id') {
+                    return `<td class="px-4 py-3 font-mono font-bold text-amber-300">#${val}</td>`;
+                  }
+                  if (c.name === 'activo') {
+                    return `<td class="px-4 py-3 font-mono">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${val ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/80' : 'bg-slate-800 text-slate-400 border border-slate-700'}">
+                        ${val ? 'true (activo)' : 'false (inactivo)'}
+                      </span>
+                    </td>`;
+                  }
+                  if (c.name === 'rol') {
+                    return `<td class="px-4 py-3">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${val === 'admin' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-blue-950 text-blue-300 border border-blue-800'}">
+                        ${val || 'lector'}
+                      </span>
+                    </td>`;
+                  }
+                  if (c.name === 'password') {
+                    return `<td class="px-4 py-3 font-mono text-slate-500 text-[11px]">••••••••</td>`;
+                  }
+                  if (c.name === 'libro_id' || c.name === 'usuario_id') {
+                    return `<td class="px-4 py-3 font-mono text-cyan-300">
+                      <span class="bg-cyan-950/80 border border-cyan-800/80 px-1.5 py-0.5 rounded text-[11px]">${val}</span>
+                    </td>`;
+                  }
+                  if (c.name === 'copias_disponibles' || c.name === 'copias_totales') {
+                    return `<td class="px-4 py-3 font-mono font-semibold text-slate-200">${val}</td>`;
+                  }
+                  return `<td class="px-4 py-3 text-slate-200 text-xs">${val === null || val === undefined ? '<span class="text-slate-600 italic font-mono">null</span>' : escapeHtml(String(val))}</td>`;
+                }).join('')}
+                <td class="px-4 py-3 text-right">
+                  <button onclick="event.stopPropagation(); inspectDbRecord(${idx})" class="inline-flex items-center px-2.5 py-1 rounded bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white text-[11px] font-semibold transition-colors">
+                    Ver
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function inspectDbRecord(index) {
+      const row = currentDbRows[index];
+      if (!row) return;
+
+      const cols = DB_SCHEMAS[activeDbTable] || [];
+      const titleEl = document.getElementById('record-detail-title');
+      if (titleEl) {
+        titleEl.innerHTML = `<span>🐘 Registro #${row.id} — Tabla <code class="text-amber-400 font-mono">${activeDbTable}</code></span>`;
+      }
+      
+      const fieldsContainer = document.getElementById('record-detail-fields');
+      if (fieldsContainer) {
+        fieldsContainer.innerHTML = cols.map(c => `
+          <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-white">${c.name}</span>
+              <span class="text-[10px] font-mono text-slate-500">${c.type}</span>
+            </div>
+            <div class="font-mono text-xs text-slate-200 break-words">
+              ${row[c.name] === null || row[c.name] === undefined ? '<span class="text-slate-600 italic">null</span>' : escapeHtml(String(row[c.name]))}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      currentRecordJson = JSON.stringify(row, null, 2);
+      const jsonEl = document.getElementById('record-detail-json');
+      if (jsonEl) jsonEl.innerText = currentRecordJson;
+      openModal('modal-record-detail');
+    }
+
+    function copyRecordJson() {
+      if (!currentRecordJson) return;
+      navigator.clipboard.writeText(currentRecordJson);
+      const btn = document.getElementById('btn-copy-record-json');
+      if (btn) {
+        btn.innerText = '¡Copiado!';
+        setTimeout(() => btn.innerText = 'Copiar JSON', 2000);
       }
     }
 
