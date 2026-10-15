@@ -89,21 +89,26 @@ def auth_login(request):
     email = request.data.get('email', '').strip().lower()
     password = request.data.get('password', '').strip()
 
-    if not email:
-        return Response({"detail": "El correo o usuario es requerido."}, status=status.HTTP_400_BAD_REQUEST)
+    if not email or not password:
+        return Response({"detail": "Se requiere ingresar tanto el usuario o correo como la contraseña."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # 1. Chequeo de credenciales de Administrador por defecto
-    if (email in ['admin', 'admin@biblioteca.com', 'admin@biblioteca.local']) and password in ['admin1234', 'admin', 'admin123']:
-        return Response({
-            "authenticated": True,
-            "token": "admin-session-token",
-            "user": {
-                "id": 0,
-                "nombre": "Administrador del Sistema",
-                "email": "admin@biblioteca.com",
-                "rol": "admin"
-            }
-        })
+    # 1. Chequeo estricto de credenciales de Administrador (no automático)
+    if email in ['admin', 'admin@biblioteca.com', 'admin@biblioteca.local']:
+        if password == 'admin1234':
+            return Response({
+                "authenticated": True,
+                "token": "admin-session-token",
+                "user": {
+                    "id": 0,
+                    "nombre": "Administrador del Sistema",
+                    "email": "admin@biblioteca.com",
+                    "rol": "admin"
+                }
+            })
+        else:
+            return Response({
+                "detail": "Contraseña de administrador incorrecta. Debe ingresar tanto el usuario como la contraseña de administrador válidos."
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
     # 2. Búsqueda en modelo Usuario
     try:
@@ -534,8 +539,8 @@ def sistema_db_inspector(request):
             except Exception:
                 server_version = f"{db_engine} (activo)"
 
-            # Tablas principales del sistema
-            nombres_tablas = ['libros', 'usuarios', 'prestamos', 'django_migrations', 'auth_user']
+            # Tablas principales del modelo de negocio
+            nombres_tablas = ['usuarios', 'libros', 'prestamos']
             for t in nombres_tablas:
                 try:
                     cursor.execute(f"SELECT count(*) FROM {t};")
@@ -570,10 +575,26 @@ def sistema_db_inspector(request):
                 except Exception:
                     pass
 
+                # Filas y registros reales de la tabla
+                filas = []
+                try:
+                    cursor.execute(f"SELECT * FROM {t} ORDER BY id ASC LIMIT 50;")
+                    col_names = [desc[0] for desc in cursor.description]
+                    for r in cursor.fetchall():
+                        fila_dict = {}
+                        for idx, val in enumerate(r):
+                            if hasattr(val, 'isoformat'):
+                                val = val.isoformat()
+                            fila_dict[col_names[idx]] = val
+                        filas.append(fila_dict)
+                except Exception:
+                    pass
+
                 tablas_info.append({
                     "tabla": t,
                     "registros": count,
-                    "columnas": columnas
+                    "columnas": columnas,
+                    "filas": filas
                 })
 
             # Relaciones / Claves foráneas (Dependencias entre tablas)

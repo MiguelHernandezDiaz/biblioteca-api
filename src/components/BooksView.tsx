@@ -38,7 +38,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
   onOpenLogin,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +59,8 @@ export const BooksView: React.FC<BooksViewProps> = ({
       l.autor.toLowerCase().includes(term) ||
       l.isbn.toLowerCase().includes(term);
 
-    const matchesAvailability = onlyAvailable ? l.copias_disponibles > 0 : true;
+    const isAvailable = (l.copias_disponibles || 0) > 0;
+    const matchesAvailability = onlyAvailable ? isAvailable : true;
 
     return matchesSearch && matchesAvailability;
   });
@@ -146,11 +147,11 @@ export const BooksView: React.FC<BooksViewProps> = ({
               onChange={(e) => setOnlyAvailable(e.target.checked)}
               className="w-3.5 h-3.5 rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
             />
-            <span>Solo con copias disponibles</span>
+            <span>Solo libros disponibles para préstamo</span>
           </label>
 
-          <span className="text-xs text-slate-500">
-            {filteredLibros.length} {filteredLibros.length === 1 ? 'libro' : 'libros'}
+          <span className="text-xs text-slate-400 font-medium">
+            {filteredLibros.length} {filteredLibros.length === 1 ? 'libro disponible' : 'libros disponibles'}
           </span>
         </div>
       </div>
@@ -209,28 +210,20 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   </div>
                 </div>
 
-                {/* Stock availability indicator */}
-                <div className="px-4 py-2 bg-slate-950/60 border-t border-b border-slate-800/80 text-xs">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-slate-400 text-[11px]">Disponibilidad:</span>
-                    <span
-                      className={`text-[11px] font-semibold ${
-                        hasCopies ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {libro.copias_disponibles} de {libro.copias_totales} disponibles
+                {/* Disponibilidad para préstamo (sin cantidad de copias) */}
+                <div className="px-4 py-2.5 bg-slate-950/60 border-t border-b border-slate-800/80 text-xs flex items-center justify-between">
+                  <span className="text-slate-400 text-[11px]">Disponibilidad:</span>
+                  {hasCopies ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Disponible para préstamo
                     </span>
-                  </div>
-
-                  {/* Stock bar */}
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-300 ${
-                        hasCopies ? 'bg-emerald-500' : 'bg-rose-500'
-                      }`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                      No disponible
+                    </span>
+                  )}
                 </div>
 
                 {/* Card Actions */}

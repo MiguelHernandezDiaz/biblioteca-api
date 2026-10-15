@@ -40,22 +40,31 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
     const emailTrim = loginEmail.trim().toLowerCase();
     const passTrim = loginPass.trim();
 
-    // Check admin credentials
-    if (
-      (emailTrim === 'admin' || emailTrim === 'admin@biblioteca.com') &&
-      (passTrim === 'admin1234' || passTrim === 'admin')
-    ) {
-      const adminUser: AuthUser = {
-        id: 0,
-        nombre: 'Administrador del Sistema',
-        email: 'admin@biblioteca.com',
-        rol: 'admin',
-        token: 'admin-token-session',
-      };
+    if (!emailTrim || !passTrim) {
       setLoginLoading(false);
-      onLoginSuccess(adminUser);
-      onCloseLogin();
+      setLoginError('Debes ingresar tanto el usuario o correo como la contraseña.');
       return;
+    }
+
+    // Verificación estricta de credenciales de Administrador (no automático)
+    if (emailTrim === 'admin' || emailTrim === 'admin@biblioteca.com') {
+      if (passTrim === 'admin1234') {
+        const adminUser: AuthUser = {
+          id: 0,
+          nombre: 'Administrador del Sistema',
+          email: 'admin@biblioteca.com',
+          rol: 'admin',
+          token: 'admin-token-session',
+        };
+        setLoginLoading(false);
+        onLoginSuccess(adminUser);
+        onCloseLogin();
+        return;
+      } else {
+        setLoginLoading(false);
+        setLoginError('Contraseña de administrador incorrecta. Debe ingresar tanto el usuario como la contraseña de administrador válidos.');
+        return;
+      }
     }
 
     // Default reader logins or custom users
@@ -81,7 +90,7 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
     }
 
     setLoginLoading(false);
-    setLoginError('Credenciales incorrectas. Ingresa tu correo o usa los accesos de prueba.');
+    setLoginError('Credenciales incorrectas. Ingresa un usuario y contraseña válidos.');
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
@@ -102,32 +111,6 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
     setRegLoading(false);
     onRegisterSuccess(newUser);
     onCloseRegister();
-  };
-
-  const quickLogin = (email: string, pass: string) => {
-    setLoginEmail(email);
-    setLoginPass(pass);
-    if (email === 'admin') {
-      const adminUser: AuthUser = {
-        id: 0,
-        nombre: 'Administrador del Sistema',
-        email: 'admin@biblioteca.com',
-        rol: 'admin',
-        token: 'admin-token-session',
-      };
-      onLoginSuccess(adminUser);
-      onCloseLogin();
-    } else {
-      const normalUser: AuthUser = {
-        id: 1,
-        nombre: 'Ana Gómez',
-        email: 'ana.gomez@universidad.edu',
-        rol: 'usuario',
-        token: 'user-token-ana',
-      };
-      onLoginSuccess(normalUser);
-      onCloseLogin();
-    }
   };
 
   return (
@@ -192,28 +175,13 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
               </button>
             </form>
 
-            <div className="pt-3 border-t border-slate-800 space-y-2 text-xs">
-              <span className="text-slate-400 block text-[11px]">Acceso rápido para demostración:</span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => quickLogin('ana.gomez@universidad.edu', '123456')}
-                  className="p-2 bg-slate-950 hover:bg-slate-800 rounded-lg border border-slate-800 text-slate-300 text-left text-[11px]"
-                >
-                  👤 <span className="font-bold">Lector</span>
-                  <br />
-                  Ana Gómez
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quickLogin('admin', 'admin1234')}
-                  className="p-2 bg-slate-950 hover:bg-slate-800 rounded-lg border border-slate-800 text-amber-300 text-left text-[11px]"
-                >
-                  🛡️ <span className="font-bold">Admin</span>
-                  <br />
-                  admin / admin1234
-                </button>
-              </div>
+            <div className="pt-3 border-t border-slate-800 space-y-1.5 text-xs">
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                🛡️ <span className="font-semibold text-slate-300">Acceso de Administrador:</span> Ingresa el usuario (<code className="text-amber-300 font-mono">admin</code>) y la contraseña de administrador (<code className="text-amber-300 font-mono">admin1234</code>).
+              </p>
+              <p className="text-slate-500 text-[11px] leading-relaxed">
+                👤 <span className="font-semibold text-slate-400">Cuenta de Lector:</span> Ingresa con tu correo y contraseña registrados o crea una cuenta nueva.
+              </p>
             </div>
           </div>
         </div>

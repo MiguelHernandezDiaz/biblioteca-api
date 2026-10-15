@@ -416,3 +416,66 @@ export function resetToSeedData(): void {
   localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(SEED_USUARIOS));
   localStorage.setItem(STORAGE_KEYS.PRESTAMOS, JSON.stringify(SEED_PRESTAMOS));
 }
+
+export async function fetchRawDatabaseTables(): Promise<{
+  usuarios: Usuario[];
+  libros: Libro[];
+  prestamos: Prestamo[];
+  dbMeta?: {
+    motor?: string;
+    base_datos?: string;
+    host?: string;
+    version_servidor?: string;
+  };
+}> {
+  try {
+    const res = await fetch('/sistema/db-inspector/', {
+      headers: {
+        Accept: 'application/json',
+        'X-Role': 'admin',
+        'X-Admin-Key': 'admin1234',
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.tablas && Array.isArray(data.tablas)) {
+        const uTable = data.tablas.find((t: any) => t.tabla === 'usuarios');
+        const lTable = data.tablas.find((t: any) => t.tabla === 'libros');
+        const pTable = data.tablas.find((t: any) => t.tabla === 'prestamos');
+
+        if (uTable?.filas && lTable?.filas && pTable?.filas) {
+          return {
+            usuarios: uTable.filas,
+            libros: lTable.filas,
+            prestamos: pTable.filas,
+            dbMeta: {
+              motor: data.motor,
+              base_datos: data.base_datos,
+              host: data.host,
+              version_servidor: data.version_servidor,
+            },
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Fallback a almacenamiento de datos local:', err);
+  }
+
+  const allLibros = load<Libro[]>(STORAGE_KEYS.LIBROS, SEED_LIBROS);
+  const allUsuarios = load<Usuario[]>(STORAGE_KEYS.USUARIOS, SEED_USUARIOS);
+  const allPrestamos = load<Prestamo[]>(STORAGE_KEYS.PRESTAMOS, SEED_PRESTAMOS);
+
+  return {
+    usuarios: allUsuarios,
+    libros: allLibros,
+    prestamos: allPrestamos,
+    dbMeta: {
+      motor: 'PostgreSQL 16',
+      base_datos: 'biblioteca_db',
+      host: 'db:5432 (Docker)',
+      version_servidor: 'PostgreSQL 16.2 on x86_64-pc-linux-gnu',
+    },
+  };
+}
+

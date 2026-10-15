@@ -224,6 +224,7 @@ export const App: React.FC = () => {
 
   // Stats calculation
   const totalBooks = libros.length;
+  const availableBooks = libros.filter((l) => (l.copias_disponibles || 0) > 0).length;
   const availableCopies = libros.reduce((acc, curr) => acc + curr.copias_disponibles, 0);
   const totalUsers = usuarios.length;
   const activeLoans = prestamos.filter((p) => p.activo).length;
@@ -243,6 +244,7 @@ export const App: React.FC = () => {
         }}
         stats={{
           totalBooks,
+          availableBooks,
           availableCopies,
           totalUsers,
           activeLoans,

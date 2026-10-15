@@ -7,6 +7,7 @@ interface HeaderProps {
   setActiveTab: (tab: 'books' | 'my-loans' | 'loans' | 'users' | 'scanner' | 'database') => void;
   stats: {
     totalBooks: number;
+    availableBooks: number;
     availableCopies: number;
     totalUsers: number;
     activeLoans: number;
@@ -95,8 +96,9 @@ export const Header: React.FC<HeaderProps> = ({
                 className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                   activeTab === 'books' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-400'
                 }`}
+                title="Libros disponibles para préstamo"
               >
-                {stats.availableCopies}/{stats.totalBooks}
+                {stats.availableBooks}
               </span>
             </button>
 
@@ -163,7 +165,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>Escanear ISBN</span>
                 </button>
 
-                {/* PostgreSQL & Dependencias (Exclusivo Administrador) */}
+                {/* PostgreSQL & Tablas de la BD (Exclusivo Administrador) */}
                 <button
                   onClick={() => setActiveTab('database')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
@@ -171,20 +173,11 @@ export const Header: React.FC<HeaderProps> = ({
                       ? 'bg-amber-600 text-white shadow-sm'
                       : 'text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 border border-amber-800/40'
                   }`}
-                  title="Inspección de base de datos PostgreSQL y dependencias (Admin)"
+                  title="Inspección de las 3 tablas relacionales en PostgreSQL (Admin)"
                 >
                   <Database className="w-3.5 h-3.5" />
-                  <span>🐘 PostgreSQL &amp; Deps</span>
+                  <span>🐘 Tablas PostgreSQL</span>
                 </button>
-
-                <a
-                  href="/admin/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg text-xs font-medium border border-slate-800 ml-1"
-                >
-                  <span>Django Admin ↗</span>
-                </a>
               </>
             )}
           </nav>
